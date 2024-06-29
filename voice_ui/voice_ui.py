@@ -1,0 +1,259 @@
+import logging
+import os
+import queue
+import threading
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Callable, Dict, Optional
+
+from .speech_recognition.openai_whisper import WhisperTranscriber
+from .speech_recognition.speech_detector import (
+    Event,
+    MetaDataEvent,
+    PartialSpeechEndedEvent,
+    SpeechDetector,
+    SpeechEndedEvent,
+    SpeechStartedEvent,
+)
+from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
+
+
+class WaitingForHotwordEvent(Event):
+    pass
+
+
+class HotwordDetectedEvent(Event):
+    pass
+
+
+class VoiceUI:
+    def __init__(
+        self,
+        speech_callback: Callable[Event, bool],
+        config: Optional[Dict] = None,
+    ):
+        self._config = config if config else {}
+        self._terminated = True
+        self._speech_callback = speech_callback
+
+        speaker_profiles_dir = os.environ.get('VOICE_PROFILES_DIR')
+
+        # Voice input
+        self._speech_events = queue.Queue()
+        self._speech_detector = SpeechDetector(
+            pv_access_key=os.environ['PORCUPINE_ACCESS_KEY'],
+            pre_speech_audio_length=1.0,  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
+            callback=self._on_speech_detected,
+            speaker_profiles_dir=Path(speaker_profiles_dir) if speaker_profiles_dir else None,
+        )
+        self._listener_thread = None
+
+        # Voice output
+        self._speaker_queue = queue.Queue()
+        self._tts_streamer = TextToSpeechAudioStreamer()
+
+    def _on_speech_detected(self, event):
+        if isinstance(event, MetaDataEvent):
+            return
+
+        self._speech_events.put(event)
+
+    def _listener(self):
+        """
+        This method listens for speech events and handles the transcription of audio data into text.
+
+        It uses the WhisperTranscriber to convert the audio data into text. The method continuously listens for speech
+        events from the speech detector and processes them accordingly.
+
+        If no speech event is received for 30 seconds, it stops the speech detector, calls the speech callback to
+        indicate waiting for the hotword, detects the hotword, and starts the speech detector again.
+
+        When speech is detected, it stops the TTS stream and calls the speech callback with the appropriate event.
+        When partial or complete speech is received, it transcribes the audio data into text using the WhisperTranscriber
+        and calls the speech callback with the transcribed text and speaker information.
+
+        The method runs until the `_terminated` flag is set.
+        """
+        whisper = WhisperTranscriber()
+        user_input = ''
+        self._last_speech_event_at = datetime.now()
+
+        def safe_callback_call(*args, **kwargs):
+            """
+            Helper function to safely call the speech callback, catching and logging any exceptions.
+            """
+            try:
+                self._speech_callback(*args, **kwargs)
+            except Exception as e:
+                logging.error(f'Error in speech callback: {e}')
+
+        # Keep listening until an utterance is detected
+        while not self._terminated:
+            try:
+                # Wait for the next speech event from the queue
+                event = self._speech_events.get(timeout=1)
+                audio_data = event.get('audio_data')
+                metadata = event.get('metadata')
+
+                self._last_speech_event_at = datetime.now()
+            except queue.Empty:
+                # If no speech event is received within 1 second
+                now = datetime.now()
+                if self._tts_streamer.is_speaking():
+                    # If the TTS is currently speaking, update the last speech event time
+                    self._last_speech_event_at = now
+                    continue
+
+                hotword_inactivity_timeout = self._config.get('hotword_inactivity_timeout')
+                if hotword_inactivity_timeout and (now - self._last_speech_event_at) > timedelta(seconds=hotword_inactivity_timeout):
+                    # If no speech event is received for 30 seconds
+                    self._speech_detector.stop()
+                    # Call the speech callback to indicate waiting for hotword
+                    safe_callback_call(event=WaitingForHotwordEvent())
+                    user_input = ''
+
+                    # Detect the hotword
+                    self._speech_detector.detect_hot_keyword(
+                        additional_keyword_paths=self._config.get('additional_keyword_paths', {})
+                    )
+
+                    # Call the speech callback to indicate hotword detected
+                    safe_callback_call(event=HotwordDetectedEvent())
+                    self._speech_detector.start()
+                    self._last_speech_event_at = datetime.now()
+
+                continue
+
+            if not isinstance(event, (SpeechStartedEvent, PartialSpeechEndedEvent, SpeechEndedEvent)):
+                logging.debug(f'Speech event: {event}')
+                continue
+
+            if isinstance(event, SpeechStartedEvent):
+                logging.info("Speech detected. Stopping TTS stream.")
+                self.stop_speaking()
+                safe_callback_call(event=event)
+
+            if isinstance(event, (PartialSpeechEndedEvent, SpeechEndedEvent)):
+                # Update the user role name
+                if audio_data is None:
+                    logging.error(f'No audio data for event {event}')
+                    continue
+
+                try:
+                    # Convert speech to text
+                    response = whisper.transcribe(
+                        audio_data=audio_data,
+                        prompt=user_input
+                    )
+                    user_input += (' ' + response.text.strip())
+                    user_input = user_input.strip()
+                except Exception as e:
+                    logging.error(f'Error transcribing audio: {e}')
+                    continue
+
+                speaker = ((metadata and metadata['speaker']) or {}).get('name', 'user')
+
+                # Call the speech callback
+                safe_callback_call(
+                    event=PartialSpeechEndedEvent(
+                        text=response.text.strip(),
+                        speaker=speaker,
+                    )
+                )
+
+                # Call the speech callback
+                if isinstance(event, SpeechEndedEvent) and len(user_input) > 0:
+                    safe_callback_call(
+                        event=SpeechEndedEvent(
+                            text=user_input,
+                            speaker=speaker,
+                        )
+                    )
+                    user_input = ''
+
+                logging.info(f'Utterance: "{user_input}"')
+
+    def _text_to_speech(self):
+        while not self._terminated:
+            try:
+                text = self._speaker_queue.get(timeout=1)
+
+                # if not self._voice_output_enabled:
+                #     continue
+
+                logging.debug(f'Transcribing text: "{text}"')
+
+                self._tts_streamer.speak(
+                    text=text,
+                    voice=self._config.get('voice_name'),
+                )
+
+            except queue.Empty:
+                continue
+            except Exception as e:
+                logging.error(f'Error while transcribing text: {e}')
+
+    def start(self):
+        if not self._terminated:
+            return
+
+        self._terminated = False
+
+        self._tts_thread = threading.Thread(target=self._text_to_speech, daemon=True)
+        self._tts_thread.start()
+
+        self._listener_thread = threading.Thread(target=self._listener, daemon=True)
+        self._listener_thread.start()
+
+        self._speech_detector.start()
+
+    def terminate(self, timeout: Optional[float] = None):
+        if self._terminated:
+            return
+
+        self._terminated = True
+
+        self._speech_detector.stop()
+
+        try:
+            self._speech_events.put(MetaDataEvent())
+            self._listener_thread.join(timeout=timeout)
+        finally:
+            self._listener_thread = None
+
+        try:
+            self._tts_thread.join(timeout=timeout)
+        finally:
+            self._tts_thread = None
+
+    def stop_listening(self):
+        # Set the date to zero seconds after epoch
+        self._last_speech_event_at = datetime.fromtimestamp(0)
+
+    def resume(self):
+        pass
+
+    def speak(self, text: str, wait: bool = False):
+        if wait:
+            self._tts_streamer.speak(
+                text=text,
+                voice=self._config.get('voice_name'),
+            )
+            while self._tts_streamer.is_speaking():
+                time.sleep(timedelta(milliseconds=10).total_seconds())
+        else:
+            self._speaker_queue.put(text)
+
+    def is_speaking(self) -> bool:
+        return self._speaker_queue.qsize() > 0 or self._tts_streamer.is_speaking()
+
+    def stop_speaking(self):
+        logging.debug('Cleaning output speech queue')
+        while True:
+            try:
+                self._speaker_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        self._tts_streamer.stop()

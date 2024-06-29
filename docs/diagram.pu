@@ -1,0 +1,62 @@
+@startuml
+
+skin rose
+
+' left to right direction
+set namespaceSeparator .
+skinparam MaxMessageSize 50
+
+package "ui" as ui {
+   package "voice" as voice {
+      component VoiceUI
+      component SpeechDetector
+      component TextToSpeechAudioStreamer
+      package vad_microphone {
+         component MicrophoneVADStream
+         component HotwordDetector
+      }
+      component SpeakerProfileManager
+      component WhisperTranscriber
+   }
+}
+
+package "utils" as utils {
+   package microphone {
+      component MicrophoneStream
+   }
+}
+
+VoiceUI --* SpeechDetector
+VoiceUI --o WhisperTranscriber: transcribe()
+VoiceUI -left-* TextToSpeechAudioStreamer: speak(), stop()
+
+TextToSpeechAudioStreamer --o [requests]
+TextToSpeechAudioStreamer --o [utils.player.Player]: play_data()
+
+SpeechDetector --o SpeakerProfileManager: load_profiles()
+SpeechDetector --|> MicrophoneVADStream: extends
+SpeechDetector --* [pveagle.Eagle]: create_recognizer()
+
+SpeakerProfileManager --o [pveagle.EagleProfiler]: create_profiler()
+SpeakerProfileManager --o [pveagle.EagleProfile]: from_bytes()
+SpeakerProfileManager --o [pvrecorder.PvRecorder]: start(), read(), stop(), delete()
+
+MicrophoneVADStream --* [pvcobra.Cobra]: process(), delete()
+MicrophoneVADStream --* [pveagle.Eagle]: process(), delete()
+MicrophoneVADStream --o [pveagle.EagleProfiler]
+MicrophoneVADStream --|> [utils.microphone.MicrophoneStream]
+
+[utils.microphone.MicrophoneStream] --* [pyaudio.PyAudio]
+[utils.player.Player] --* [pyaudio.PyAudio]
+
+HotwordDetector --* [pvporcupine.Porcupine]
+
+[plugins.voice_profiler.VoiceProfileManager] --* SpeakerProfileManager: load_profile(), create_profile(), list_profiles()
+
+note top of [plugins.voice_profiler.VoiceProfileManager]
+   <b>TODO:</b> Make this plugin use the SpeakerProfileManager
+end note
+
+WhisperTranscriber --* [openai.OpenAI]
+
+@enduml
