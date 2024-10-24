@@ -4,3 +4,4 @@ docs/doxygen
 .env
 __pycache__
 .venv
+dist/
