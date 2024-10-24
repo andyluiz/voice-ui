@@ -1,3 +1,18 @@
+colorama
 openai
+pvcobra
 pveagle
+pvporcupine
+pvrecorder
+pyaudio
 python-dotenv
+requests
+six
+google-cloud-speech
+sox
+
+# Tools
+black
+coverage  # Measure code/test coverage
+flake8  # Python linting
+isort

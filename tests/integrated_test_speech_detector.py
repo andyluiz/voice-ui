@@ -2,12 +2,11 @@
 import os
 import unittest
 import wave
-from datetime import datetime
 
-import alsaaudio
 import dotenv
-import openai
 from six.moves import queue
+
+from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
 from voice_ui.speech_recognition.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -29,11 +28,7 @@ class TestSpeechDetector(unittest.TestCase):
         #     ]
         # )
 
-        self.client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
-        self.mixer = alsaaudio.Mixer()   # defined alsaaudio.Mixer to change volume
-        current_volume = self.mixer.getvolume()  # get volume float value
-        print(f"Initial Volume: {current_volume}")
+        self.whisper = WhisperTranscriber()
 
     def test_get_chunk_from_buffer_with_non_empty_queue(self):
         transcriptions = []
@@ -50,37 +45,16 @@ class TestSpeechDetector(unittest.TestCase):
 
             if isinstance(event, SpeechStartedEvent):
                 print('\nSpeech start detected')
-                current_volume = self.mixer.getvolume()  # get volume float value
-                # print(f"Current Volume: {current_volume}")
-                self.mixer.setvolume(30, channel=alsaaudio.MIXER_CHANNEL_ALL)  # set volume
 
             elif isinstance(event, (SpeechEndedEvent, PartialSpeechEndedEvent)):
                 print('\nSpeech {} detected'.format("end" if isinstance(event, SpeechEndedEvent) else "partial end"))
-                if isinstance(event, SpeechEndedEvent):
-                    for c, v in enumerate(current_volume):
-                        self.mixer.setvolume(v, channel=c)  # set original volume
 
                 print(f"Speaker: {metadata['speaker']}")
 
-                # Create the name of the audio file using current time
-                now = datetime.now()
-                audio_file_name = "speech_" + now.strftime("%Y%m%d-%H%M%S") + ".wav"
-
-                with wave.open(audio_file_name, "wb") as wf:
-                    wf.setnchannels(audio_data['channels'])
-                    wf.setsampwidth(audio_data['sample_size'])
-                    wf.setframerate(audio_data['rate'])
-                    wf.writeframes(audio_data['content'])
-                    wf.close()
-
-                with open(audio_file_name, "rb") as audio_file:
-                    response = self.client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        # language="pt",
-                        prompt=transcriptions[-1] if isinstance(event, PartialSpeechEndedEvent) and transcriptions else None,
-                        response_format="verbose_json",
-                    )
+                response = self.whisper.transcribe(
+                    audio_data=audio_data,
+                    prompt=transcriptions[-1] if isinstance(event, PartialSpeechEndedEvent) and transcriptions else None,
+                )
 
                 transcription = response.text
 
@@ -111,22 +85,22 @@ class TestSpeechDetector(unittest.TestCase):
             # speaker_profiles_dir=(config.user_data_dir / 'voice_profiles'),
         )
 
-        # #############################################################################
-        # # Read audio from file
-        # with wave.open("tests/resources/youtube_show.wav", "rb") as wf:
-        #     source_data = queue.Queue()
-        #     int16_list = wf.readframes(wf.getnframes())
-        #     for i in range(0, len(int16_list), 1024):
-        #         chunks = int16_list[i:i + 1024]
-        #         if len(chunks) == 1024:
-        #             source_data.put(chunks)
+        #############################################################################
+        # Read audio from file
+        with wave.open("tests/resources/youtube_show.wav", "rb") as wf:
+            source_data = queue.Queue()
+            int16_list = wf.readframes(wf.getnframes())
+            for i in range(0, len(int16_list), 1024):
+                chunks = int16_list[i:i + 1024]
+                if len(chunks) == 1024:
+                    source_data.put(chunks)
 
-        # def get_chunks_from_file(*args, **kwargs):
-        #     return source_data.get()
+        def get_chunks_from_file(*args, **kwargs):
+            return source_data.get()
 
-        # # Replace function _get_chunk_from_buffer
-        # self.speech_detector._get_chunk_from_buffer = get_chunks_from_file
-        # #############################################################################
+        # Replace function _get_chunk_from_buffer
+        self.speech_detector._get_chunk_from_buffer = get_chunks_from_file
+        #############################################################################
 
         # Detect speech
         self.speech_detector.start()

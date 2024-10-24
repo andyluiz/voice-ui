@@ -17,7 +17,7 @@ checks: flake8
 .PHONY: flake8
 flake8:
 	@echo Running flake8
-	$(VENV)/bin/flake8 .
+	$(VENV)/bin/flake8 --exclude .venv .
 
 .PHONY: tests
 tests:
@@ -47,9 +47,9 @@ compile:
 	$(PYTHON) -m py_compile $(SRCS)
 
 clean:
-	find ./ -type d -name '__pycache__' -exec rm -rf {} \;
+	find ./voice_ui ./examples ./tests -type d -name '__pycache__' -exec rm -rf {} \;
 	rm -rf docs/doxygen
-	rm -rf htmlcov
+	rm -rf htmlcov .coverage
 
 .PHONY: docs
 docs:
