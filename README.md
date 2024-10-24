@@ -1,6 +1,18 @@
-# Introduction
+# Voice UI
 
 ## Setup
+
+Install *portaudio* and *libjack*
+
+```bash
+sudo apt install libjack-jackd2-dev portaudio19-dev
+```
+
+Install python requirements
+
+```bash
+pip install -r requirements.txt
+```
 
 Create a .env file with the following content:
 
