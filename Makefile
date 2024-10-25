@@ -24,7 +24,7 @@ tests:
 	@echo Running tests
 	$(COVERAGE) erase
 	$(COVERAGE) run -m unittest discover -v
-	$(COVERAGE) report -m -i --fail-under=75
+	$(COVERAGE) report --omit='tests/*.py' -m -i --fail-under=75
 	$(COVERAGE) html -i
 
 .PHONY: online_tests

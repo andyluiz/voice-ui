@@ -9,28 +9,28 @@ from typing import Callable, Dict, Optional
 
 from .speech_recognition.openai_whisper import WhisperTranscriber
 from .speech_recognition.speech_detector import (
-    Event,
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
     SpeechEndedEvent,
+    SpeechEvent,
     SpeechStartedEvent,
 )
 from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
 
 
-class WaitingForHotwordEvent(Event):
+class WaitingForHotwordEvent(SpeechEvent):
     pass
 
 
-class HotwordDetectedEvent(Event):
+class HotwordDetectedEvent(SpeechEvent):
     pass
 
 
 class VoiceUI:
     def __init__(
         self,
-        speech_callback: Callable[Event, bool],
+        speech_callback: Callable[SpeechEvent, bool],
         config: Optional[Dict] = None,
     ):
         self._config = config if config else {}

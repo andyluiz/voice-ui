@@ -1,6 +1,7 @@
 import logging
 import queue
 import threading
+from abc import ABC
 from collections import deque
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
@@ -11,13 +12,10 @@ from .speaker_profile_manager import SpeakerProfileManager
 from .vad_microphone import MicrophoneVADStream
 
 
-class Event:
-    def __init__(
-        self,
-        **kwargs,
-    ):
-        if self.name == 'Event':
-            raise AttributeError('Event is an abstract class, you cannot instantiate it')
+class SpeechEvent(ABC):
+    def __init__(self, **kwargs):
+        if self.__class__ == SpeechEvent:
+            raise TypeError('SpeechEvent is an abstract class and cannot be instantiated directly')
 
         for k, v in kwargs.items():
             if not hasattr(self, k):
@@ -26,41 +24,30 @@ class Event:
                 raise AttributeError(f'{self.__class__.__name__} already has attribute {k}')
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.__class__.__name__
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return False
         return (self.__dict__ == other.__dict__)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.__dict__})'
 
-    def get(self, key, default=None):
-        if key in self.__dict__:
-            return self.__dict__[key]
-        return default
+    def get(self, key: str, default=None):
+        return self.__dict__.get(key, default)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str):
         return self.__dict__[key]
 
     def __iter__(self):
-        for k, v in self.__dict__.items():
-            yield k, v
+        return iter(self.__dict__.items())
 
     # def __getattr__(self, key):
     #     if key in self._data:
     #         return self._data[key]
     #     raise AttributeError(f'{self.__class__.__name__} has no attribute {key}')
-
-
-class SpeechEvent(Event):
-    def __init__(self, **kwargs):
-        if self.name == 'SpeechEvent':
-            raise AttributeError('SpeechEvent is an abstract class, you cannot instantiate it')
-
-        super().__init__(**kwargs)
 
 
 class MetaDataEvent(SpeechEvent):
