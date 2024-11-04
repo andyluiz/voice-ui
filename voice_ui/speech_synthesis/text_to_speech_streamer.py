@@ -115,13 +115,15 @@ class TextToSpeechAudioStreamer:
                 # Stream the content
                 logging.debug('Reading chunks from API response')
                 num_chunks = 0
+                buffer_underrun_protection_enabled = True
                 with wave.open(response.raw, 'rb') as wf:
-                    while (data := wf.readframes(1024)):
+                    while (data := wf.readframes(4096 if buffer_underrun_protection_enabled else 1024)):
                         if self.is_stopped():
                             logging.debug('Stream is stopped. Leaving.')
                             break
                         num_chunks += len(data)
                         stream.put(data)
+                        buffer_underrun_protection_enabled = False
                 logging.debug(f'Done reading {num_chunks} chunks from API response')
 
                 break

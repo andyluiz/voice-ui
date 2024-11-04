@@ -5,7 +5,7 @@ from ..audio_io.pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 
 # Audio recording parameters
 RATE = 16000
-CHUNK = int(RATE / 10)  # 100ms
+CHUNK = int(RATE / 20)  # 50ms
 
 
 class MicrophoneStream(object):

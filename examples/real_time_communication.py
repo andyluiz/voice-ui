@@ -1,5 +1,7 @@
 import os
 import sys
+from datetime import datetime
+from pathlib import Path
 
 import dotenv
 from colorama import Fore
@@ -9,12 +11,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from voice_ui import (
     PartialSpeechEndedEvent,
+    PartialTranscriptionEvent,
     SpeechEndedEvent,
     SpeechStartedEvent,
+    TranscriptionEvent,
     VoiceUI,
 )
 
 dotenv.load_dotenv()
+
+
+def print_event(msg):
+    # Print the event and the timestamp (including milliseconds)
+    now = datetime.now().strftime("%H:%M:%S.%f")
+    print(f"[{now}] {msg}")
 
 
 # Main function
@@ -24,6 +34,9 @@ def main():
 
     config = {
         # 'hotword_inactivity_timeout': 30,
+        'voice_profiles_dir': Path(os.path.join(Path(__file__).parent, "voice_profiles")),
+        'post_speech_duration': 1.0,
+        'max_speech_duration': 10,
     }
 
     voice_ui = VoiceUI(
@@ -38,21 +51,25 @@ def main():
         text = event.get("text")
 
         if isinstance(event, SpeechStartedEvent):
-            print(f"\n{Fore.RED}Speech start detected{Fore.RESET}")
+            print_event(f"{Fore.RED}Speech start detected{Fore.RESET}")
 
         elif isinstance(event, PartialSpeechEndedEvent):
-            print(f"\n{Fore.YELLOW}Speech partial end detected{Fore.RESET}")
-            print(f"Partial text: {text}{Fore.RESET}")
+            print_event(f"{Fore.YELLOW}Speech partial end detected{Fore.RESET}")
 
         elif isinstance(event, SpeechEndedEvent):
-            print(f"\n{Fore.GREEN}Speech end detected{Fore.RESET}")
-            print(f"Full text: {text}{Fore.RESET}")
+            print_event(f"{Fore.GREEN}Speech end detected{Fore.RESET}")
+
+        elif isinstance(event, PartialTranscriptionEvent):
+            print_event(f"{Fore.YELLOW}Partial transcription event. Text: \"{text}\", Speaker: {event.get('speaker')}{Fore.RESET}")
+
+        elif isinstance(event, TranscriptionEvent):
+            print_event(f"{Fore.GREEN}Transcription event. Text: \"{text}\", Speaker: {event.get('speaker')}{Fore.RESET}")
 
             # Repeat what the user said
             voice_ui.speak(text)
 
         else:
-            print(event)
+            print_event(event)
 
     # Detect speech
     voice_ui.start()

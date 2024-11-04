@@ -6,7 +6,13 @@ from .speech_recognition.speech_detector import (
     SpeechEvent,
     SpeechStartedEvent,
 )
-from .voice_ui import HotwordDetectedEvent, VoiceUI, WaitingForHotwordEvent
+from .voice_ui import (
+    HotwordDetectedEvent,
+    VoiceUI,
+    WaitingForHotwordEvent,
+    PartialTranscriptionEvent,
+    TranscriptionEvent,
+)
 
 __all__ = [
     "VoiceUI",
@@ -18,4 +24,6 @@ __all__ = [
     "SpeechEndedEvent",
     "WaitingForHotwordEvent",
     "HotwordDetectedEvent",
+    "PartialTranscriptionEvent",
+    "TranscriptionEvent",
 ]

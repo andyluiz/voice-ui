@@ -5,7 +5,13 @@ from queue import Empty
 from threading import Thread
 from unittest.mock import MagicMock, call, patch
 
-from voice_ui import HotwordDetectedEvent, VoiceUI, WaitingForHotwordEvent
+from voice_ui import (
+    HotwordDetectedEvent,
+    PartialTranscriptionEvent,
+    TranscriptionEvent,
+    VoiceUI,
+    WaitingForHotwordEvent,
+)
 from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
 from voice_ui.speech_recognition.speech_detector import (
     MetaDataEvent,
@@ -24,9 +30,9 @@ class TestVoiceUI(unittest.TestCase):
         self.mock_speech_callback = MagicMock()
         self.mock_config = {
             'voice_name': 'test_voice',
+            'voice_profiles_dir': '/tmp/voice_profiles',
         }
         os.environ['PORCUPINE_ACCESS_KEY'] = '1234'
-        os.environ['VOICE_PROFILES_DIR'] = '/tmp/voice_profiles'
 
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),
@@ -158,9 +164,12 @@ class TestVoiceUI(unittest.TestCase):
 
         self.mock_speech_callback.assert_has_calls([
             call(event=SpeechStartedEvent()),
-            call(event=PartialSpeechEndedEvent(text='transcribed partial text', speaker='John Doe')),
-            call(event=PartialSpeechEndedEvent(text='transcribed final text', speaker='user')),
-            call(event=SpeechEndedEvent(text='transcribed partial text transcribed final text', speaker='user')),
+            call(event=PartialSpeechEndedEvent(audio_data=None, metadata={'speaker': {'name': 'John Doe'}})),
+            call(event=PartialSpeechEndedEvent(audio_data='audio data 2', metadata={'speaker': {'name': 'John Doe'}})),
+            call(event=PartialTranscriptionEvent(text='transcribed partial text', speaker='John Doe')),
+            call(event=SpeechEndedEvent(audio_data='audio data 3', metadata=None)),
+            call(event=PartialTranscriptionEvent(text='transcribed final text', speaker='user')),
+            call(event=TranscriptionEvent(text='transcribed partial text transcribed final text', speaker='user')),
         ])
 
     @patch.object(Thread, 'start')

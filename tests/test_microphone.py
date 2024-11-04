@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import MagicMock, call, patch
 
 import pyaudio
+
 from voice_ui.speech_recognition.microphone import MicrophoneStream
 
 
@@ -17,8 +18,8 @@ class TestMicrophoneStream(unittest.TestCase):
         self.assertEqual(self.stream._rate, 16000)
         self.assertEqual(self.stream.rate, 16000)
 
-        self.assertEqual(self.stream._chunk, 1600)
-        self.assertEqual(self.stream.chunk_size, 1600)
+        self.assertEqual(self.stream._chunk, 800)
+        self.assertEqual(self.stream.chunk_size, 800)
 
         self.assertEqual(self.stream._channels, 1)
         self.assertEqual(self.stream.channels, 1)

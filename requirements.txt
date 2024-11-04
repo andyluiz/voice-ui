@@ -10,6 +10,7 @@ requests
 six
 google-cloud-speech
 sox
+pydub
 
 # Tools
 black

@@ -4,7 +4,6 @@ import queue
 import threading
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from .speech_recognition.openai_whisper import WhisperTranscriber
@@ -27,6 +26,14 @@ class HotwordDetectedEvent(SpeechEvent):
     pass
 
 
+class PartialTranscriptionEvent(SpeechEvent):
+    pass
+
+
+class TranscriptionEvent(SpeechEvent):
+    pass
+
+
 class VoiceUI:
     def __init__(
         self,
@@ -37,15 +44,15 @@ class VoiceUI:
         self._terminated = True
         self._speech_callback = speech_callback
 
-        speaker_profiles_dir = os.environ.get('VOICE_PROFILES_DIR')
-
         # Voice input
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
             pv_access_key=os.environ['PORCUPINE_ACCESS_KEY'],
-            pre_speech_audio_length=1.0,  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
             callback=self._on_speech_detected,
-            speaker_profiles_dir=Path(speaker_profiles_dir) if speaker_profiles_dir else None,
+            speaker_profiles_dir=self._config.get('voice_profiles_dir'),
+            pre_speech_audio_length=self._config.get('pre_speech_audio_length', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
+            post_speech_duration=self._config.get('post_speech_duration', 1.0),
+            max_speech_duration=self._config.get('max_speech_duration', 10),
         )
         self._listener_thread = None
 
@@ -135,6 +142,9 @@ class VoiceUI:
                 safe_callback_call(event=event)
 
             if isinstance(event, (PartialSpeechEndedEvent, SpeechEndedEvent)):
+                # Call the speech callback
+                safe_callback_call(event=event)
+
                 # Update the user role name
                 if audio_data is None:
                     logging.error(f'No audio data for event {event}')
@@ -156,7 +166,7 @@ class VoiceUI:
 
                 # Call the speech callback
                 safe_callback_call(
-                    event=PartialSpeechEndedEvent(
+                    event=PartialTranscriptionEvent(
                         text=response.text.strip(),
                         speaker=speaker,
                     )
@@ -165,7 +175,7 @@ class VoiceUI:
                 # Call the speech callback
                 if isinstance(event, SpeechEndedEvent) and len(user_input) > 0:
                     safe_callback_call(
-                        event=SpeechEndedEvent(
+                        event=TranscriptionEvent(
                             text=user_input,
                             speaker=speaker,
                         )

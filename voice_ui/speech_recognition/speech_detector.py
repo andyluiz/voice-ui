@@ -102,8 +102,11 @@ class SpeechDetector(MicrophoneVADStream):
             self._eagle_recognizer = None
 
     def start(self):
+        self._speaker_profiles = []
         if self._speaker_profiles_dir:
+            logging.info(f'Loading speaker profiles from {self._speaker_profiles_dir}')
             self._speaker_profiles = SpeakerProfileManager(self._speaker_profiles_dir).load_profiles()
+            logging.info(f'Loaded {len(self._speaker_profiles)} speaker profiles')
 
         if self._eagle_recognizer is not None:
             self._eagle_recognizer.delete()
@@ -114,7 +117,7 @@ class SpeechDetector(MicrophoneVADStream):
                 access_key=self._pv_access_key,
                 speaker_profiles=list(map(lambda x: x["profile_data"], self._speaker_profiles))
             )
-            assert self._eagle_recognizer.frame_length == self._cobra.frame_length
+            assert self._eagle_recognizer.frame_length == self._cobra.frame_length, "Frame length mismatch"
 
         self._thread = threading.Thread(
             target=self._run,
@@ -343,7 +346,7 @@ class SpeechDetector(MicrophoneVADStream):
         n_collected_chunks = len(self.collected_chunks)
         if (
             n_collected_chunks > int(0.8 * max_chunks)
-            and self.below_threshold_counter >= 5
+            and self.below_threshold_counter >= 5  # TODO: Make this configurable
         ) or n_collected_chunks > int(1.2 * max_chunks):
             speaker_sum = sum(self.speaker_scores)
             scores = list(map(lambda x: (x / speaker_sum) if speaker_sum > 0 else 0, self.speaker_scores))

@@ -1,9 +1,11 @@
+import io
 import os
 import sys
 import tempfile
-import wave
 
+import numpy as np
 import openai
+from pydub import AudioSegment, silence
 
 try:
     from contextlib import contextmanager
@@ -53,7 +55,7 @@ class WhisperTranscriber:
     def __init__(self):
         self._client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-    def transcribe(self, audio_data, **kwargs):
+    def transcribe(self, audio_data, **kwargs) -> openai.types.audio.TranscriptionVerbose:
         """Transcribe audio using Whisper"""
         try:
             # Create a temporary file in the default temporary directory
@@ -62,13 +64,25 @@ class WhisperTranscriber:
             temp_file.close()
             audio_file_name = temp_file.name
 
-            with wave.open(audio_file_name, "wb") as wf:
-                wf.setnchannels(audio_data['channels'])
-                wf.setsampwidth(audio_data['sample_size'])
-                wf.setframerate(audio_data['rate'])
-                wf.writeframes(audio_data['content'])
-                wf.close()
+            # Convert the audio data to a WAV file
+            sound = AudioSegment.from_raw(
+                io.BytesIO(audio_data['content']),
+                sample_width=audio_data['sample_size'],
+                frame_rate=audio_data['rate'],
+                channels=audio_data['channels']
+            )
 
+            # Trim the audio to remove silence
+            start_trim = silence.detect_leading_silence(sound)
+            end_trim = silence.detect_leading_silence(sound.reverse())
+
+            duration = len(sound)
+            trimmed_sound = sound[start_trim:(duration - end_trim)]
+
+            # Save the trimmed audio to a temporary file
+            trimmed_sound.export(audio_file_name, format="wav")
+
+            # Transcribe the audio using OpenAI
             with open(audio_file_name, "rb") as audio_file:
                 response = self._client.audio.transcriptions.create(
                     model="whisper-1",
@@ -81,3 +95,17 @@ class WhisperTranscriber:
             os.unlink(audio_file_name)
 
         return response
+
+    @staticmethod
+    def calculate_rms(frames):
+        # Convert frames to numpy array
+        audio_data = np.frombuffer(frames, dtype=np.int16)
+
+        # Normalize the audio data
+        max_amplitude = np.iinfo(np.int16).max
+        normalized_audio = audio_data / max_amplitude
+
+        # Calculate the RMS value
+        rms_value = np.sqrt(np.mean(normalized_audio**2))
+
+        return rms_value
