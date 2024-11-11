@@ -37,6 +37,7 @@ def main():
         'voice_profiles_dir': Path(os.path.join(Path(__file__).parent, "voice_profiles")),
         'post_speech_duration': 1.0,
         'max_speech_duration': 10,
+        'tts_engine': 'google',
     }
 
     voice_ui = VoiceUI(
