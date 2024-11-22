@@ -20,7 +20,6 @@ from voice_ui.speech_recognition.speech_detector import (
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
-from voice_ui.speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
 
 
 # Mock imports from the module where VoiceUI is defined
@@ -36,9 +35,11 @@ class TestVoiceUI(unittest.TestCase):
 
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),
-            patch.object(TextToSpeechAudioStreamer, '__new__', spec=TextToSpeechAudioStreamer),
+            patch('voice_ui.speech_synthesis.text_to_speech_streamer_factory.create_tts_streamer') as mock_create_tts_streamer,
         ):
             self.voice_ui = VoiceUI(speech_callback=self.mock_speech_callback, config=self.mock_config)
+
+            mock_create_tts_streamer.assert_called_once()
 
     def test_initialization(self):
         self.assertTrue(self.voice_ui._terminated)

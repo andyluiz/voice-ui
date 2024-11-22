@@ -9,6 +9,7 @@ python-dotenv
 requests
 six
 google-cloud-speech
+google-cloud-texttospeech
 sox
 pydub
 

@@ -15,6 +15,7 @@ from .speech_recognition.speech_detector import (
     SpeechEvent,
     SpeechStartedEvent,
 )
+from .speech_synthesis import text_to_speech_streamer_factory as tts_factory
 from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
 
 
@@ -58,7 +59,7 @@ class VoiceUI:
 
         # Voice output
         self._speaker_queue = queue.Queue()
-        self._tts_streamer = TextToSpeechAudioStreamer()
+        self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'whisper'))
 
     def _on_speech_detected(self, event):
         if isinstance(event, MetaDataEvent):
