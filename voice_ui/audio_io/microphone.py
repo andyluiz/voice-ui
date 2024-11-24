@@ -1,7 +1,7 @@
 import pyaudio
 from six.moves import queue
 
-from ..audio_io.pyaudio_load_message_suppressor import no_alsa_and_jack_errors
+from .pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 
 # Audio recording parameters
 RATE = 16000

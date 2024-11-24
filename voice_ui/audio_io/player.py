@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import pyaudio
 
-from ..audio_io.pyaudio_load_message_suppressor import no_alsa_and_jack_errors
+from .pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 
 
 class Player:

@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
-from voice_ui.speech_recognition.speaker_profile_manager import SpeakerProfileManager
+from voice_ui.speech_detection.speaker_profile_manager import SpeakerProfileManager
 
 
 class TestSpeakerProfileManager(unittest.TestCase):

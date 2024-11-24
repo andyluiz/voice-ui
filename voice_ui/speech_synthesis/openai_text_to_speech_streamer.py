@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 import requests
 
-from .player import Player
+from ..audio_io.player import Player
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
 

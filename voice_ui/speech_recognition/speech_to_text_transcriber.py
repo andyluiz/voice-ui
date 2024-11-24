@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod, abstractstaticmethod
 
-from .audio_data import AudioData
+from ..audio_io.audio_data import AudioData
 
 
 class SpeechToTextTranscriber(ABC):

@@ -1,4 +1,4 @@
-from .speech_recognition.speech_detector import (
+from .speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
@@ -8,10 +8,10 @@ from .speech_recognition.speech_detector import (
 )
 from .voice_ui import (
     HotwordDetectedEvent,
-    VoiceUI,
-    WaitingForHotwordEvent,
     PartialTranscriptionEvent,
     TranscriptionEvent,
+    VoiceUI,
+    WaitingForHotwordEvent,
 )
 
 __all__ = [

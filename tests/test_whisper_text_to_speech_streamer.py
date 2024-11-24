@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
+from voice_ui.audio_io.player import Player
 from voice_ui.speech_synthesis.openai_text_to_speech_streamer import (
     OpenAITextToSpeechAudioStreamer,
 )
-from voice_ui.speech_synthesis.player import Player
 
 
 def player_init(self):

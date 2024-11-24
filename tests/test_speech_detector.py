@@ -3,10 +3,10 @@ from collections import deque
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
-from voice_ui.speech_recognition.speaker_profile_manager import SpeakerProfileManager
+from voice_ui.speech_detection.speaker_profile_manager import SpeakerProfileManager
 
 # Assuming the following imports from your module
-from voice_ui.speech_recognition.speech_detector import (
+from voice_ui.speech_detection.speech_detector import (
     AudioData,
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -14,7 +14,7 @@ from voice_ui.speech_recognition.speech_detector import (
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
-from voice_ui.speech_recognition.vad_microphone import MicrophoneVADStream
+from voice_ui.speech_detection.vad_microphone import MicrophoneVADStream
 
 
 def mock_mic_stream_init(self, *args, **kwargs):

@@ -8,7 +8,7 @@ from typing import Callable, List, Optional, Tuple
 
 import pveagle
 
-from .audio_data import AudioData
+from ..audio_io.audio_data import AudioData
 from .speaker_profile_manager import SpeakerProfileManager
 from .vad_microphone import MicrophoneVADStream
 
