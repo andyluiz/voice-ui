@@ -8,6 +8,7 @@ from typing import Callable, List, Optional, Tuple
 
 import pveagle
 
+from .audio_data import AudioData
 from .speaker_profile_manager import SpeakerProfileManager
 from .vad_microphone import MicrophoneVADStream
 
@@ -311,12 +312,12 @@ class SpeechDetector(MicrophoneVADStream):
 
         callback(
             event=SpeechEndedEvent(
-                audio_data={
-                    "channels": self.channels,
-                    "sample_size": self.sample_size,
-                    "rate": self.rate,
-                    "content": b"".join(self.collected_chunks),
-                },
+                audio_data=AudioData(
+                    channels=self.channels,
+                    sample_size=self.sample_size,
+                    rate=self.rate,
+                    content=b"".join(self.collected_chunks),
+                ),
                 metadata={
                     "speaker": speaker_info,
                 }
@@ -354,12 +355,12 @@ class SpeechDetector(MicrophoneVADStream):
 
             callback(
                 event=PartialSpeechEndedEvent(
-                    audio_data={
-                        "channels": self.channels,
-                        "sample_size": self.sample_size,
-                        "rate": self.rate,
-                        "content": b"".join(self.collected_chunks),
-                    },
+                    audio_data=AudioData(
+                        channels=self.channels,
+                        sample_size=self.sample_size,
+                        rate=self.rate,
+                        content=b"".join(self.collected_chunks),
+                    ),
                     metadata={
                         "speaker": speaker_info,
                     }

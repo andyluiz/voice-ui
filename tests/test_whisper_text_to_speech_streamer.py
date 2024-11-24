@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from voice_ui.speech_synthesis.player import Player
-from voice_ui.speech_synthesis.whisper_text_to_speech_streamer import (
-    WhisperTextToSpeechAudioStreamer,
+from voice_ui.speech_synthesis.openai_text_to_speech_streamer import (
+    OpenAITextToSpeechAudioStreamer,
 )
+from voice_ui.speech_synthesis.player import Player
 
 
 def player_init(self):
@@ -20,7 +20,7 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
     @patch('threading.Thread')
     @patch.object(Player, '__init__', new=player_init)
     def setUp(self, mock_thread):
-        self.streamer = WhisperTextToSpeechAudioStreamer()
+        self.streamer = OpenAITextToSpeechAudioStreamer()
 
         self.streamer._player = MagicMock()
 

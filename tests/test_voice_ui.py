@@ -138,8 +138,8 @@ class TestVoiceUI(unittest.TestCase):
 
         with patch('voice_ui.speech_recognition.openai_whisper.WhisperTranscriber.transcribe') as mock_transcribe:
             mock_transcribe.side_effect = [
-                MagicMock(text='transcribed partial text'),
-                MagicMock(text='transcribed final text'),
+                'transcribed partial text',
+                'transcribed final text',
             ]
 
             self.voice_ui._listener()

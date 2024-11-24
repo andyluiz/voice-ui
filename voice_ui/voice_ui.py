@@ -6,7 +6,9 @@ import time
 from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 
-from .speech_recognition.openai_whisper import WhisperTranscriber
+from .speech_recognition import (
+    speech_to_text_transcriber_factory as transcriber_factory,
+)
 from .speech_recognition.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -15,6 +17,7 @@ from .speech_recognition.speech_detector import (
     SpeechEvent,
     SpeechStartedEvent,
 )
+from .speech_recognition.speech_to_text_transcriber import SpeechToTextTranscriber
 from .speech_synthesis import text_to_speech_streamer_factory as tts_factory
 from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
 
@@ -57,9 +60,12 @@ class VoiceUI:
         )
         self._listener_thread = None
 
+        # Voice transcriber
+        self._audio_transcriber: SpeechToTextTranscriber = transcriber_factory.create_transcriber(self._config.get('audio_transcriber', 'whisper'))
+
         # Voice output
         self._speaker_queue = queue.Queue()
-        self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'whisper'))
+        self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'openai-tts'))
 
     def _on_speech_detected(self, event):
         if isinstance(event, MetaDataEvent):
@@ -83,7 +89,6 @@ class VoiceUI:
 
         The method runs until the `_terminated` flag is set.
         """
-        whisper = WhisperTranscriber()
         user_input = ''
         self._last_speech_event_at = datetime.now()
 
@@ -151,37 +156,38 @@ class VoiceUI:
                     logging.error(f'No audio data for event {event}')
                     continue
 
-                try:
-                    # Convert speech to text
-                    response = whisper.transcribe(
-                        audio_data=audio_data,
-                        prompt=user_input
-                    )
-                    user_input += (' ' + response.text.strip())
-                    user_input = user_input.strip()
-                except Exception as e:
-                    logging.error(f'Error transcribing audio: {e}')
-                    continue
-
                 speaker = ((metadata and metadata['speaker']) or {}).get('name', 'user')
 
-                # Call the speech callback
-                safe_callback_call(
-                    event=PartialTranscriptionEvent(
-                        text=response.text.strip(),
-                        speaker=speaker,
-                    )
-                )
+                if self._audio_transcriber is not None:
+                    try:
+                        # Convert speech to text
+                        response = self._audio_transcriber.transcribe(
+                            audio_data=audio_data,
+                            prompt=user_input
+                        )
+                        user_input += (' ' + response)
+                        user_input = user_input.strip()
+                    except Exception as e:
+                        logging.error(f'Error transcribing audio: {e}')
+                        continue
 
-                # Call the speech callback
-                if isinstance(event, SpeechEndedEvent) and len(user_input) > 0:
+                    # Call the speech callback
                     safe_callback_call(
-                        event=TranscriptionEvent(
-                            text=user_input,
+                        event=PartialTranscriptionEvent(
+                            text=response,
                             speaker=speaker,
                         )
                     )
-                    user_input = ''
+
+                    # Call the speech callback
+                    if isinstance(event, SpeechEndedEvent) and len(user_input) > 0:
+                        safe_callback_call(
+                            event=TranscriptionEvent(
+                                text=user_input,
+                                speaker=speaker,
+                            )
+                        )
+                        user_input = ''
 
                 logging.info(f'Utterance: "{user_input}"')
 

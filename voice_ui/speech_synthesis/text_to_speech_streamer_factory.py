@@ -11,10 +11,10 @@ except ModuleNotFoundError:
     pass
 
 try:
-    from .whisper_text_to_speech_streamer import WhisperTextToSpeechAudioStreamer
+    from .openai_text_to_speech_streamer import OpenAITextToSpeechAudioStreamer
 
     # Module loaded successfully
-    available_tts_engines.append(WhisperTextToSpeechAudioStreamer)
+    available_tts_engines.append(OpenAITextToSpeechAudioStreamer)
 except ModuleNotFoundError:
     pass
 

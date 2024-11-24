@@ -1,61 +1,22 @@
 import io
 import os
-import sys
 import tempfile
 
 import numpy as np
 import openai
 from pydub import AudioSegment, silence
 
-try:
-    from contextlib import contextmanager
-
-    import whisper_timestamped as whisper
-
-    @contextmanager
-    def suppress_stdout():
-        # Auxiliary function to suppress Whisper logs (it is quite verbose)
-        # All credit goes to: https://thesmithfam.org/blog/2012/10/25/temporarily-suppress-console-output-in-python/
-        with open(os.devnull, "w") as devnull:
-            old_stdout = sys.stdout
-            sys.stdout = devnull
-            try:
-                yield
-            finally:
-                sys.stdout = old_stdout
-
-    class LocalWhisperTranscriber:
-        def __init__(self, model="small", device=None):
-            self.model = whisper.load_model(model, device=device)
-            self._buffer = ""
-
-        def transcribe(self, waveform):
-            """Transcribe audio using Whisper"""
-            # Pad/trim audio to fit 30 seconds as required by Whisper
-            audio = waveform.astype("float32").reshape(-1)
-            audio = whisper.pad_or_trim(audio)
-
-            # Transcribe the given audio while suppressing logs
-            with suppress_stdout():
-                transcription = whisper.transcribe(
-                    self.model,
-                    audio,
-                    # We use past transcriptions to condition the model
-                    initial_prompt=self._buffer,
-                    verbose=True  # to avoid progress bar
-                )
-
-            return transcription
-
-except ImportError:
-    pass
+from .speech_to_text_transcriber import AudioData, SpeechToTextTranscriber
 
 
-class WhisperTranscriber:
+class WhisperTranscriber(SpeechToTextTranscriber):
     def __init__(self):
         self._client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-    def transcribe(self, audio_data, **kwargs) -> openai.types.audio.TranscriptionVerbose:
+    def name() -> str:
+        return "whisper"
+
+    def transcribe(self, audio_data: AudioData, prompt: str = None) -> str:
         """Transcribe audio using Whisper"""
         try:
             # Create a temporary file in the default temporary directory
@@ -66,10 +27,10 @@ class WhisperTranscriber:
 
             # Convert the audio data to a WAV file
             sound = AudioSegment.from_raw(
-                io.BytesIO(audio_data['content']),
-                sample_width=audio_data['sample_size'],
-                frame_rate=audio_data['rate'],
-                channels=audio_data['channels']
+                io.BytesIO(audio_data.content),
+                sample_width=audio_data.sample_size,
+                frame_rate=audio_data.rate,
+                channels=audio_data.channels
             )
 
             # Trim the audio to remove silence
@@ -88,13 +49,13 @@ class WhisperTranscriber:
                     model="whisper-1",
                     file=audio_file,
                     response_format="verbose_json",
-                    **kwargs,
+                    prompt=prompt,
                 )
         finally:
             # Delete the temporary file
             os.unlink(audio_file_name)
 
-        return response
+        return response.text.strip()
 
     @staticmethod
     def calculate_rms(frames):

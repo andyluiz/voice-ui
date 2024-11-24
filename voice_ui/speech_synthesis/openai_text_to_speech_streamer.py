@@ -12,7 +12,7 @@ from .player import Player
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
 
-class WhisperTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
+class OpenAITextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
     @unique
     class Voice(StrEnum):
         ALLOY = 'alloy'
@@ -40,7 +40,7 @@ class WhisperTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
 
     @staticmethod
     def name():
-        return "whisper"
+        return "openai-tts"
 
     def __del__(self):
         self.stop()
