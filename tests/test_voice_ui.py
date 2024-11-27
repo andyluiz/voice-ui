@@ -1,4 +1,3 @@
-import os
 import unittest
 from datetime import datetime
 from queue import Empty
@@ -25,13 +24,13 @@ from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
 # Mock imports from the module where VoiceUI is defined
 class TestVoiceUI(unittest.TestCase):
 
+    @patch('os.environ', {'PORCUPINE_ACCESS_KEY': '1234', 'OPENAI_API_KEY': '1234'})
     def setUp(self):
         self.mock_speech_callback = MagicMock()
         self.mock_config = {
             'voice_name': 'test_voice',
             'voice_profiles_dir': '/tmp/voice_profiles',
         }
-        os.environ['PORCUPINE_ACCESS_KEY'] = '1234'
 
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),

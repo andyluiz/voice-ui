@@ -28,6 +28,9 @@ except ModuleNotFoundError:
 
 
 def create_transcriber(transcription_engine_name) -> SpeechToTextTranscriber:
+    if transcription_engine_name is None:
+        return None
+
     for engine in available_transcription_engines:
         if transcription_engine_name == engine.name():
             return engine()

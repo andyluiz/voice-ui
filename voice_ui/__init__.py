@@ -1,3 +1,4 @@
+from .audio_io.audio_data import AudioData
 from .speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -26,4 +27,5 @@ __all__ = [
     "HotwordDetectedEvent",
     "PartialTranscriptionEvent",
     "TranscriptionEvent",
+    "AudioData",
 ]

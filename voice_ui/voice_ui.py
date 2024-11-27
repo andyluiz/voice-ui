@@ -106,8 +106,6 @@ class VoiceUI:
             try:
                 # Wait for the next speech event from the queue
                 event = self._speech_events.get(timeout=1)
-                audio_data = event.get('audio_data')
-                metadata = event.get('metadata')
 
                 self._last_speech_event_at = datetime.now()
             except queue.Empty:
@@ -152,10 +150,12 @@ class VoiceUI:
                 safe_callback_call(event=event)
 
                 # Update the user role name
+                audio_data = event.get('audio_data')
                 if audio_data is None:
                     logging.error(f'No audio data for event {event}')
                     continue
 
+                metadata = event.get('metadata')
                 speaker = ((metadata and metadata['speaker']) or {}).get('name', 'user')
 
                 if self._audio_transcriber is not None:

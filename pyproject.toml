@@ -17,7 +17,9 @@ dependencies = [
   "requests",
   "six",
   "google-cloud-speech",
+  "google-cloud-texttospeech",
   "sox",
+  "pydub",
 ]
 requires-python = ">=3.8"
 authors = [
@@ -35,4 +37,14 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Intended Audience :: Developers",
   "Programming Language :: Python",
+]
+
+[project.optional-dependencies]
+test = [
+  "coverage",
+]
+dev = [
+  "black",
+  "flake8",
+  "isort",
 ]
