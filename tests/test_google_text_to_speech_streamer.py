@@ -2,10 +2,10 @@ import queue
 import unittest
 from unittest.mock import MagicMock, patch
 
+from voice_ui.audio_io.player import Player
 from voice_ui.speech_synthesis.google_text_to_speech_streamer import (
     GoogleTextToSpeechAudioStreamer,
 )
-from voice_ui.speech_synthesis.player import Player
 
 
 def player_init(self):

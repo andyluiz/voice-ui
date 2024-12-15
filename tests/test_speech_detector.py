@@ -3,17 +3,18 @@ from collections import deque
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
-from voice_ui.speech_recognition.speaker_profile_manager import SpeakerProfileManager
+from voice_ui.speech_detection.speaker_profile_manager import SpeakerProfileManager
 
 # Assuming the following imports from your module
-from voice_ui.speech_recognition.speech_detector import (
+from voice_ui.speech_detection.speech_detector import (
+    AudioData,
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
-from voice_ui.speech_recognition.vad_microphone import MicrophoneVADStream
+from voice_ui.speech_detection.vad_microphone import MicrophoneVADStream
 
 
 def mock_mic_stream_init(self, *args, **kwargs):
@@ -248,12 +249,12 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.callback.assert_called_with(
             event=SpeechEndedEvent(
-                audio_data={
-                    "channels": 1,
-                    "sample_size": 2,
-                    "rate": 16000,
-                    "content": b'chunk1chunk2',
-                },
+                audio_data=AudioData(
+                    channels=1,
+                    sample_size=2,
+                    rate=16000,
+                    content=b'chunk1chunk2',
+                ),
                 metadata={
                     "speaker": {
                         "name": "Speaker 1",
@@ -291,9 +292,9 @@ class TestSpeechDetector(unittest.TestCase):
         self.callback.assert_called_once()
         event = self.callback.call_args[1]['event']
         self.assertIsInstance(event, PartialSpeechEndedEvent)
-        self.assertEqual(event.audio_data['channels'], 1)
-        self.assertEqual(event.audio_data['sample_size'], 2)
-        self.assertEqual(event.audio_data['rate'], 16000)
+        self.assertEqual(event.audio_data.channels, 1)
+        self.assertEqual(event.audio_data.sample_size, 2)
+        self.assertEqual(event.audio_data.rate, 16000)
         self.assertEqual(event.metadata['speaker']['name'], "Speaker1")
         self.assertEqual(len(self.detector.collected_chunks), 0)
 

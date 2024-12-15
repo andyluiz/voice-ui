@@ -6,8 +6,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 
-from .speech_recognition.openai_whisper import WhisperTranscriber
-from .speech_recognition.speech_detector import (
+from .speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
@@ -15,6 +14,10 @@ from .speech_recognition.speech_detector import (
     SpeechEvent,
     SpeechStartedEvent,
 )
+from .speech_recognition import (
+    speech_to_text_transcriber_factory as transcriber_factory,
+)
+from .speech_recognition.speech_to_text_transcriber import SpeechToTextTranscriber
 from .speech_synthesis import text_to_speech_streamer_factory as tts_factory
 from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
 
@@ -55,11 +58,14 @@ class VoiceUI:
             post_speech_duration=self._config.get('post_speech_duration', 1.0),
             max_speech_duration=self._config.get('max_speech_duration', 10),
         )
-        self._listener_thread = None
+        self._speech_event_handler_thread = None
+
+        # Voice transcriber
+        self._audio_transcriber: SpeechToTextTranscriber = transcriber_factory.create_transcriber(self._config.get('audio_transcriber', 'whisper'))
 
         # Voice output
         self._speaker_queue = queue.Queue()
-        self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'whisper'))
+        self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'openai-tts'))
 
     def _on_speech_detected(self, event):
         if isinstance(event, MetaDataEvent):
@@ -67,7 +73,7 @@ class VoiceUI:
 
         self._speech_events.put(event)
 
-    def _listener(self):
+    def _speech_event_handler(self):
         """
         This method listens for speech events and handles the transcription of audio data into text.
 
@@ -83,7 +89,6 @@ class VoiceUI:
 
         The method runs until the `_terminated` flag is set.
         """
-        whisper = WhisperTranscriber()
         user_input = ''
         self._last_speech_event_at = datetime.now()
 
@@ -101,14 +106,12 @@ class VoiceUI:
             try:
                 # Wait for the next speech event from the queue
                 event = self._speech_events.get(timeout=1)
-                audio_data = event.get('audio_data')
-                metadata = event.get('metadata')
 
                 self._last_speech_event_at = datetime.now()
             except queue.Empty:
                 # If no speech event is received within 1 second
                 now = datetime.now()
-                if self._tts_streamer.is_speaking():
+                if self.is_speaking():
                     # If the TTS is currently speaking, update the last speech event time
                     self._last_speech_event_at = now
                     continue
@@ -147,45 +150,89 @@ class VoiceUI:
                 safe_callback_call(event=event)
 
                 # Update the user role name
+                audio_data = event.get('audio_data')
                 if audio_data is None:
                     logging.error(f'No audio data for event {event}')
                     continue
 
-                try:
-                    # Convert speech to text
-                    response = whisper.transcribe(
-                        audio_data=audio_data,
-                        prompt=user_input
-                    )
-                    user_input += (' ' + response.text.strip())
-                    user_input = user_input.strip()
-                except Exception as e:
-                    logging.error(f'Error transcribing audio: {e}')
-                    continue
-
+                metadata = event.get('metadata')
                 speaker = ((metadata and metadata['speaker']) or {}).get('name', 'user')
 
-                # Call the speech callback
-                safe_callback_call(
-                    event=PartialTranscriptionEvent(
-                        text=response.text.strip(),
-                        speaker=speaker,
-                    )
-                )
+                if self._audio_transcriber is not None:
+                    try:
+                        # Convert speech to text
+                        response = self._audio_transcriber.transcribe(
+                            audio_data=audio_data,
+                            prompt=user_input
+                        )
+                        user_input += (' ' + response)
+                        user_input = user_input.strip()
+                    except Exception as e:
+                        logging.error(f'Error transcribing audio: {e}')
+                        continue
 
-                # Call the speech callback
-                if isinstance(event, SpeechEndedEvent) and len(user_input) > 0:
+                    # Call the speech callback
                     safe_callback_call(
-                        event=TranscriptionEvent(
-                            text=user_input,
+                        event=PartialTranscriptionEvent(
+                            text=response,
                             speaker=speaker,
                         )
                     )
-                    user_input = ''
+
+                    # Call the speech callback
+                    if isinstance(event, SpeechEndedEvent) and len(user_input) > 0:
+                        safe_callback_call(
+                            event=TranscriptionEvent(
+                                text=user_input,
+                                speaker=speaker,
+                            )
+                        )
+                        user_input = ''
 
                 logging.info(f'Utterance: "{user_input}"')
 
-    def _text_to_speech(self):
+    def start(self):
+        if not self._terminated:
+            return
+
+        self._terminated = False
+
+        self._tts_thread = threading.Thread(target=self._text_to_speech_thread_function, daemon=True)
+        self._tts_thread.start()
+
+        self._speech_event_handler_thread = threading.Thread(target=self._speech_event_handler, daemon=True)
+        self._speech_event_handler_thread.start()
+
+        self._speech_detector.start()
+
+    def terminate(self, timeout: Optional[float] = None):
+        if self._terminated:
+            return
+
+        self._terminated = True
+
+        self._speech_detector.stop()
+
+        try:
+            self._speech_events.put(MetaDataEvent())
+            self._speech_event_handler_thread.join(timeout=timeout)
+        finally:
+            self._speech_event_handler_thread = None
+
+        try:
+            self._tts_thread.join(timeout=timeout)
+        finally:
+            self._tts_thread = None
+
+    def stop_listening(self):
+        # Set the date to zero seconds after epoch
+        self._last_speech_event_at = datetime.fromtimestamp(0)
+
+    def resume(self):
+        pass
+
+    # Text-to-Speech methods
+    def _text_to_speech_thread_function(self):
         while not self._terminated:
             try:
                 text = self._speaker_queue.get(timeout=1)
@@ -204,46 +251,6 @@ class VoiceUI:
                 continue
             except Exception as e:
                 logging.error(f'Error while transcribing text: {e}')
-
-    def start(self):
-        if not self._terminated:
-            return
-
-        self._terminated = False
-
-        self._tts_thread = threading.Thread(target=self._text_to_speech, daemon=True)
-        self._tts_thread.start()
-
-        self._listener_thread = threading.Thread(target=self._listener, daemon=True)
-        self._listener_thread.start()
-
-        self._speech_detector.start()
-
-    def terminate(self, timeout: Optional[float] = None):
-        if self._terminated:
-            return
-
-        self._terminated = True
-
-        self._speech_detector.stop()
-
-        try:
-            self._speech_events.put(MetaDataEvent())
-            self._listener_thread.join(timeout=timeout)
-        finally:
-            self._listener_thread = None
-
-        try:
-            self._tts_thread.join(timeout=timeout)
-        finally:
-            self._tts_thread = None
-
-    def stop_listening(self):
-        # Set the date to zero seconds after epoch
-        self._last_speech_event_at = datetime.fromtimestamp(0)
-
-    def resume(self):
-        pass
 
     def speak(self, text: str, wait: bool = False):
         if wait:

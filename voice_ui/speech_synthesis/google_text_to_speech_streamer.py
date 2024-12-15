@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 from google.cloud import texttospeech
 
-from .player import Player
+from ..audio_io.player import Player
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
 

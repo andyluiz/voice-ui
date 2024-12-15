@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import KeysView
 from unittest.mock import MagicMock, call, patch
 
-from voice_ui.speech_recognition.vad_microphone import (
+from voice_ui.speech_detection.vad_microphone import (
     HotwordDetector,
     MicrophoneStream,
     MicrophoneVADStream,
@@ -140,7 +140,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.assertEqual(result, False)
 
     def test_pause(self):
-        with patch('voice_ui.speech_recognition.microphone.MicrophoneStream.pause', return_value=None) as mock_super_pause:
+        with patch('voice_ui.audio_io.microphone.MicrophoneStream.pause', return_value=None) as mock_super_pause:
             self.stream.pause()
 
         mock_super_pause.assert_called_once()

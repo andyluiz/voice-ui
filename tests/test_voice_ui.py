@@ -1,4 +1,3 @@
-import os
 import unittest
 from datetime import datetime
 from queue import Empty
@@ -12,26 +11,26 @@ from voice_ui import (
     VoiceUI,
     WaitingForHotwordEvent,
 )
-from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
-from voice_ui.speech_recognition.speech_detector import (
+from voice_ui.speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
+from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
 
 
 # Mock imports from the module where VoiceUI is defined
 class TestVoiceUI(unittest.TestCase):
 
+    @patch('os.environ', {'PORCUPINE_ACCESS_KEY': '1234', 'OPENAI_API_KEY': '1234'})
     def setUp(self):
         self.mock_speech_callback = MagicMock()
         self.mock_config = {
             'voice_name': 'test_voice',
             'voice_profiles_dir': '/tmp/voice_profiles',
         }
-        os.environ['PORCUPINE_ACCESS_KEY'] = '1234'
 
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),
@@ -96,7 +95,7 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._speech_events.get = MagicMock(side_effect=spech_input_get_side_effect)
 
-        self.voice_ui._listener()
+        self.voice_ui._speech_event_handler()
 
         mock_datetime.now.assert_has_calls([call(), call()])
         self.voice_ui._speech_detector.stop.assert_called_once()
@@ -138,11 +137,11 @@ class TestVoiceUI(unittest.TestCase):
 
         with patch('voice_ui.speech_recognition.openai_whisper.WhisperTranscriber.transcribe') as mock_transcribe:
             mock_transcribe.side_effect = [
-                MagicMock(text='transcribed partial text'),
-                MagicMock(text='transcribed final text'),
+                'transcribed partial text',
+                'transcribed final text',
             ]
 
-            self.voice_ui._listener()
+            self.voice_ui._speech_event_handler()
 
             mock_transcribe.assert_has_calls([
                 call(audio_data='audio data 2', prompt=''),
@@ -185,7 +184,7 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._speaker_queue.get = MagicMock(side_effect=speaker_queue_get_side_effect)
 
-        self.voice_ui._text_to_speech()
+        self.voice_ui._text_to_speech_thread_function()
 
         self.voice_ui._tts_streamer.speak.assert_called_once_with(
             text='Hello World',
@@ -203,7 +202,7 @@ class TestVoiceUI(unittest.TestCase):
             raise Empty
 
         self.voice_ui._speaker_queue.get = MagicMock(side_effect=speaker_queue_get_side_effect)
-        self.voice_ui._text_to_speech()
+        self.voice_ui._text_to_speech_thread_function()
         self.assertFalse(mock_logging_error.called)
 
     @patch.object(Thread, 'start')
@@ -224,7 +223,7 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._speaker_queue.get = MagicMock(side_effect=speaker_queue_get_side_effect)
 
-        self.voice_ui._text_to_speech()
+        self.voice_ui._text_to_speech_thread_function()
 
         self.voice_ui._tts_streamer.speak.assert_has_calls([
             call(text='First pass', voice='test_voice'),

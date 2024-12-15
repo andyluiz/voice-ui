@@ -11,7 +11,7 @@ import pvcobra
 import pveagle
 import pvporcupine
 
-from .microphone import MicrophoneStream
+from ..audio_io.microphone import MicrophoneStream
 
 
 class HotwordDetector():

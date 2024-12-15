@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pyaudio
 
-from voice_ui.speech_recognition.microphone import MicrophoneStream
+from voice_ui.audio_io.microphone import MicrophoneStream
 
 
 class TestMicrophoneStream(unittest.TestCase):
