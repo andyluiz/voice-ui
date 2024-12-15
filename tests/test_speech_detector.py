@@ -230,7 +230,8 @@ class TestSpeechDetector(unittest.TestCase):
         self.detector._handle_metadata_report.assert_called_once_with(self.callback, 0.1)
         self.detector._handle_collected_chunks_overflow.assert_not_called()
 
-    def test_handle_speech_start(self):
+    @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
+    def test_handle_speech_start(self, mock_uuid4):
         self.detector.speech_detected = False
         self.detector._pre_speech_queue = [b'chunk1', b'chunk2']
         self.detector.collected_chunks = []
@@ -238,14 +239,20 @@ class TestSpeechDetector(unittest.TestCase):
         self.detector._handle_speech_start(self.callback)
         self.assertIn(b'chunk1', self.detector.collected_chunks)
         self.assertIn(b'chunk2', self.detector.collected_chunks)
+
+        mock_uuid4.assert_called_once()
+
         self.callback.assert_called_with(event=SpeechStartedEvent())
 
-    def test_handle_speech_end(self):
+    @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
+    def test_handle_speech_end(self, mock_uuid4):
         self.detector.collected_chunks = [b'chunk1', b'chunk2']
         self.detector.speaker_scores = [0.9]
 
         self.detector._speaker_profiles = [{'name': 'Speaker 1', 'profile_data': b'data'}]
         self.detector._handle_speech_end(self.callback)
+
+        mock_uuid4.assert_called_once()
 
         self.callback.assert_called_with(
             event=SpeechEndedEvent(
@@ -265,11 +272,14 @@ class TestSpeechDetector(unittest.TestCase):
             )
         )
 
-    def test_handle_metadata_report(self):
+    @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
+    def test_handle_metadata_report(self, mock_uuid4):
         self.detector.above_threshold_counter = 0
         self.detector.below_threshold_counter = 0
 
         self.detector._handle_metadata_report(self.callback, 0.5)
+
+        mock_uuid4.assert_called_once()
 
         self.callback.assert_called_once_with(
             event=MetaDataEvent(

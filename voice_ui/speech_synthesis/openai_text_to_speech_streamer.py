@@ -118,6 +118,8 @@ class OpenAITextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         with self._lock:
             self._stopped = False
 
+        logging.debug(f'Transcribing text: "{text}"')
+
         logging.debug('Making the API request')
 
         for i in range(2):

@@ -52,7 +52,7 @@ class VoiceUI:
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
             pv_access_key=os.environ['PORCUPINE_ACCESS_KEY'],
-            callback=self._on_speech_detected,
+            callback=lambda event: self._speech_events.put(event),
             speaker_profiles_dir=self._config.get('voice_profiles_dir'),
             pre_speech_audio_length=self._config.get('pre_speech_audio_length', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
             post_speech_duration=self._config.get('post_speech_duration', 1.0),
@@ -66,12 +66,6 @@ class VoiceUI:
         # Voice output
         self._speaker_queue = queue.Queue()
         self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'openai-tts'))
-
-    def _on_speech_detected(self, event):
-        if isinstance(event, MetaDataEvent):
-            return
-
-        self._speech_events.put(event)
 
     def _speech_event_handler(self):
         """
@@ -106,6 +100,9 @@ class VoiceUI:
             try:
                 # Wait for the next speech event from the queue
                 event = self._speech_events.get(timeout=1)
+
+                if isinstance(event, MetaDataEvent):
+                    continue
 
                 self._last_speech_event_at = datetime.now()
             except queue.Empty:
@@ -176,6 +173,7 @@ class VoiceUI:
                         event=PartialTranscriptionEvent(
                             text=response,
                             speaker=speaker,
+                            speech_id=event.id,
                         )
                     )
 
@@ -185,11 +183,12 @@ class VoiceUI:
                             event=TranscriptionEvent(
                                 text=user_input,
                                 speaker=speaker,
+                                speech_id=event.id,
                             )
                         )
                         user_input = ''
 
-                logging.info(f'Utterance: "{user_input}"')
+                    logging.info(f'Utterance: "{user_input}"')
 
     def start(self):
         if not self._terminated:
@@ -239,8 +238,6 @@ class VoiceUI:
 
                 # if not self._voice_output_enabled:
                 #     continue
-
-                logging.debug(f'Transcribing text: "{text}"')
 
                 self._tts_streamer.speak(
                     text=text,
