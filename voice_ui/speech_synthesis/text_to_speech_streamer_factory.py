@@ -1,6 +1,9 @@
+from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
-available_tts_engines = []
+available_tts_engines = [
+    PassThroughTextToSpeechAudioStreamer,
+]
 
 try:
     from .google_text_to_speech_streamer import GoogleTextToSpeechAudioStreamer
