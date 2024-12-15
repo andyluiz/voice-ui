@@ -83,6 +83,8 @@ class GoogleTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         with self._lock:
             self._stopped = False
 
+        logging.debug(f'Transcribing text: "{text}"')
+
         try:
             # See https://cloud.google.com/text-to-speech/docs/voices for all voices.
             voice_selection_params = texttospeech.VoiceSelectionParams(

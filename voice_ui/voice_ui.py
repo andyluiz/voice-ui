@@ -240,8 +240,6 @@ class VoiceUI:
                 # if not self._voice_output_enabled:
                 #     continue
 
-                logging.debug(f'Transcribing text: "{text}"')
-
                 self._tts_streamer.speak(
                     text=text,
                     voice=self._config.get('voice_name'),
