@@ -14,6 +14,11 @@ all: checks tests
 
 checks: flake8
 
+venv:
+	python -m venv --upgrade $(VENV)
+	$(VENV)/bin/pip install --upgrade pip
+	$(VENV)/bin/pip install -r requirements.txt
+
 .PHONY: flake8
 flake8:
 	@echo Running flake8
