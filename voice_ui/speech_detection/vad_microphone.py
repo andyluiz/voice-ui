@@ -106,7 +106,7 @@ class MicrophoneVADStream(MicrophoneStream):
 
     @staticmethod
     def _convert_data(byte_data):
-        int16_values = struct.unpack(f"{len(byte_data)//2}h", byte_data)
+        int16_values = struct.unpack(f"{len(byte_data) // 2}h", byte_data)
         int16_list = list(int16_values)
         return int16_list
 
