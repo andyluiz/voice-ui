@@ -42,33 +42,33 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         test_data = b'test audio data'
 
         def audio_bytes_queue_side_effect(timeout):
-            if self.streamer._audio_bytes_queue.get.call_count > 1:
+            if self.streamer._data_queue.get.call_count > 1:
                 self.streamer._terminated = True
                 raise queue.Empty
             return test_data
 
-        self.streamer._audio_bytes_queue = MagicMock()
-        self.streamer._audio_bytes_queue.get.side_effect = audio_bytes_queue_side_effect
+        self.streamer._data_queue = MagicMock()
+        self.streamer._data_queue.get.side_effect = audio_bytes_queue_side_effect
 
         self.streamer._speaker_thread_function()
 
         self.streamer._player.play_data.assert_called_once()
 
         self.streamer.stop()
-        self.assertEqual(self.streamer._audio_bytes_queue.get.call_count, 2)
+        self.assertEqual(self.streamer._data_queue.get.call_count, 2)
         self.assertFalse(self.streamer.is_speaking())
 
     def test_speaker_handles_exceptions_during_playback(self):
         test_data = b'test audio data'
 
         def audio_bytes_queue_side_effect(timeout):
-            if self.streamer._audio_bytes_queue.get.call_count > 1:
+            if self.streamer._data_queue.get.call_count > 1:
                 self.streamer._terminated = True
                 raise queue.Empty
             return test_data
 
-        self.streamer._audio_bytes_queue = MagicMock()
-        self.streamer._audio_bytes_queue.get.side_effect = audio_bytes_queue_side_effect
+        self.streamer._data_queue = MagicMock()
+        self.streamer._data_queue.get.side_effect = audio_bytes_queue_side_effect
 
         self.streamer._player.play_data.side_effect = Exception("Test exception")
 
@@ -77,7 +77,7 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         self.streamer._player.play_data.assert_called_once()
 
         self.streamer.stop()
-        self.assertEqual(self.streamer._audio_bytes_queue.get.call_count, 2)
+        self.assertEqual(self.streamer._data_queue.get.call_count, 2)
         self.assertFalse(self.streamer.is_speaking())
 
     def test_available_voices(self):
@@ -99,7 +99,7 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         mock_response.raw = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
-        self.streamer._audio_bytes_queue = MagicMock()
+        self.streamer._data_queue = MagicMock()
 
         with patch('wave.open') as mock_wave:
             mock_wave.return_value.__enter__.return_value.readframes.side_effect = [b'test_data', b'']
@@ -109,7 +109,7 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         self.assertFalse(self.streamer.is_stopped())
         mock_post.assert_called_once()
         mock_response.raise_for_status.assert_called_once()
-        self.streamer._audio_bytes_queue.put.assert_called_once_with(b'test_data')
+        self.streamer._data_queue.put.assert_called_once_with(b'test_data')
 
     @patch('os.environ', {"OPENAI_API_KEY": 'test_key'})
     @patch('requests.post')

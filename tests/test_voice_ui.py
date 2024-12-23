@@ -190,6 +190,7 @@ class TestVoiceUI(unittest.TestCase):
             return "Hello World"
 
         self.voice_ui._speaker_queue.get = MagicMock(side_effect=speaker_queue_get_side_effect)
+        self.voice_ui._speaker_queue.task_done = MagicMock()
 
         self.voice_ui._text_to_speech_thread_function()
 
@@ -197,6 +198,9 @@ class TestVoiceUI(unittest.TestCase):
             text='Hello World',
             voice='test_voice'
         )
+
+        self.voice_ui._speaker_queue.get.assert_called_once()
+        self.voice_ui._speaker_queue.task_done.assert_called_once()
         self.assertFalse(mock_logging_error.called)
 
     @patch.object(Thread, 'start')

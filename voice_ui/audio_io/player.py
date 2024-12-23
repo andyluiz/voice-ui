@@ -58,6 +58,17 @@ class Player:
         self,
         audio_data: bytes,
     ):
+        if len(audio_data) == 0:
+            return
+
+        free = self._stream.get_write_available()
+        audio_data_len = len(audio_data)
+
+        if audio_data_len < free:
+            fill = (free - audio_data_len)
+            print(f'fill: {fill}, audio_data: {audio_data_len}, free: {free}')
+            audio_data += bytes(fill)
+
         self._stream.write(audio_data)
 
     def play_file(

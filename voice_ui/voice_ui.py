@@ -243,6 +243,7 @@ class VoiceUI:
                     text=text,
                     voice=self._config.get('voice_name'),
                 )
+                self._speaker_queue.task_done()
 
             except queue.Empty:
                 continue
@@ -268,6 +269,7 @@ class VoiceUI:
         while True:
             try:
                 self._speaker_queue.get_nowait()
+                self._speaker_queue.task_done()
             except queue.Empty:
                 break
 

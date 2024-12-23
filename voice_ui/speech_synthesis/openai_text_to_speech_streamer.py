@@ -1,18 +1,15 @@
 import logging
 import os
-import queue
-import threading
 import wave
 from enum import StrEnum, unique
 from typing import Dict, List, Optional
 
 import requests
 
-from ..audio_io.player import Player
-from .text_to_speech_streamer import TextToSpeechAudioStreamer
+from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
 
-class OpenAITextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
+class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
     @unique
     class Voice(StrEnum):
         ALLOY = 'alloy'
@@ -22,63 +19,9 @@ class OpenAITextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         NOVA = 'nova'
         SHIMMER = 'shimmer'
 
-    def __init__(self):
-        self._stopped = False
-        self._speaking = False
-        self._lock = threading.Lock()
-
-        self._terminated = False
-        self._speaker_thread = threading.Thread(
-            target=self._speaker_thread_function,
-            daemon=True
-        )
-
-        self._audio_bytes_queue = queue.Queue()
-        self._player = Player()
-
-        self._speaker_thread.start()
-
     @staticmethod
     def name():
         return "openai-tts"
-
-    def __del__(self):
-        self.stop()
-        self._terminated = True
-        if self._speaker_thread.is_alive():
-            self._speaker_thread.join(timeout=5)
-
-    def _speaker_thread_function(self):
-        self._terminated = False
-
-        while not self._terminated:
-            try:
-                audio_data = self._audio_bytes_queue.get(timeout=1)
-
-                if self.is_stopped():
-                    continue
-
-                # logging.debug(f'Playing {len(audio_data)} bytes of audio data')
-                self._speaking = True
-                self._player.play_data(audio_data)
-                self._speaking = False
-
-            except queue.Empty:
-                continue
-            except Exception as e:
-                self._speaking = False
-                logging.error(f'Error while playing audio: {e}')
-
-    def stop(self):
-        with self._lock:
-            self._stopped = True
-
-    def is_stopped(self):
-        with self._lock:
-            return self._stopped
-
-    def is_speaking(self):
-        return self._speaking
 
     def available_voices(self) -> List[Dict]:
         return [
@@ -155,7 +98,7 @@ class OpenAITextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
                             logging.debug('Stream is stopped. Leaving.')
                             break
                         num_chunks += len(data)
-                        self._audio_bytes_queue.put(data)
+                        self._data_queue.put(data)
                         buffer_underrun_protection_enabled = False
                 logging.debug(f'Done reading {num_chunks} chunks from API response')
 
