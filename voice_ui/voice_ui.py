@@ -93,7 +93,7 @@ class VoiceUI:
             try:
                 self._speech_callback(*args, **kwargs)
             except Exception as e:
-                logging.error(f'Error in speech callback: {e}')
+                logging.error(f'Error in speech callback: {str(e)}')
 
         # Keep listening until an utterance is detected
         while not self._terminated:
@@ -266,11 +266,11 @@ class VoiceUI:
 
     def stop_speaking(self):
         logging.debug('Cleaning output speech queue')
+        self._tts_streamer.stop()
+
         while True:
             try:
                 self._speaker_queue.get_nowait()
                 self._speaker_queue.task_done()
             except queue.Empty:
                 break
-
-        self._tts_streamer.stop()

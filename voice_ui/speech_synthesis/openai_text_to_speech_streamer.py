@@ -63,49 +63,43 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
 
         logging.debug(f'Transcribing text: "{text}"')
 
-        logging.debug('Making the API request')
+        try:
+            logging.debug('Making the API request')
 
-        for i in range(2):
-            try:
-                # Send the request to the OpenAI API
-                response = requests.post(
-                    'https://api.openai.com/v1/audio/speech',
-                    headers={
-                        'Authorization': f'Bearer {os.environ["OPENAI_API_KEY"]}',
-                        'Content-Type': 'application/json; charset=utf-8',
-                    },
-                    json={
-                        "model": "tts-1",
-                        "input": text,
-                        "voice": str(voice if voice else self.Voice.SHIMMER),
-                        "response_format": "wav",
-                        **kwargs,
-                    },
-                    stream=True,
-                )
+            # Send the request to the OpenAI API
+            response = requests.post(
+                'https://api.openai.com/v1/audio/speech',
+                headers={
+                    'Authorization': f'Bearer {os.environ["OPENAI_API_KEY"]}',
+                    'Content-Type': 'application/json; charset=utf-8',
+                },
+                json={
+                    "model": "tts-1",
+                    "input": text,
+                    "voice": str(voice if voice else self.Voice.SHIMMER),
+                    "response_format": "wav",
+                    **kwargs,
+                },
+                stream=True,
+            )
 
-                logging.debug('API Response received')
+            logging.debug('API Response received')
 
-                response.raise_for_status()
+            response.raise_for_status()
 
-                # Stream the content
-                logging.debug('Reading chunks from API response')
-                num_chunks = 0
-                buffer_underrun_protection_enabled = True
-                with wave.open(response.raw, 'rb') as wf:
-                    while (data := wf.readframes(4096 if buffer_underrun_protection_enabled else 1024)):
-                        if self.is_stopped():
-                            logging.debug('Stream is stopped. Leaving.')
-                            break
-                        num_chunks += len(data)
-                        self._data_queue.put(data)
-                        buffer_underrun_protection_enabled = False
-                logging.debug(f'Done reading {num_chunks} chunks from API response')
+            # Stream the content
+            logging.debug('Reading chunks from API response')
+            num_chunks = 0
+            with wave.open(response.raw, 'rb') as wf:
+                while (data := wf.readframes(4800)):
+                    if self.is_stopped():
+                        logging.debug('Stream is stopped. Leaving.')
+                        break
+                    num_chunks += len(data)
+                    self._data_queue.put(data)
+            logging.debug(f'Done reading {num_chunks} chunks from API response')
 
-                break
-
-            except requests.exceptions.HTTPError as e:
-                logging.error(f'Error: {e}')
-                logging.debug(f'Response headers: {response.headers}')
-                logging.debug(f'Response message: {response.json()}')
-                continue
+        except requests.exceptions.HTTPError as e:
+            logging.error(f'Error: {e}')
+            logging.debug(f'Response headers: {response.headers}')
+            logging.debug(f'Response message: {response.json()}')

@@ -122,8 +122,8 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         self.streamer.speak("Hello world", text_queue)
 
         self.assertFalse(self.streamer.is_stopped())
-        self.assertEqual(mock_post.call_count, 2)
-        self.assertEqual(mock_response.raise_for_status.call_count, 2)
+        self.assertEqual(mock_post.call_count, 1)
+        self.assertEqual(mock_response.raise_for_status.call_count, 1)
 
 
 if __name__ == '__main__':

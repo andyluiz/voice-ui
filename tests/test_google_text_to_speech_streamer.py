@@ -1,4 +1,5 @@
 import queue
+import time
 import unittest
 from unittest.mock import MagicMock, call, patch
 
@@ -44,17 +45,16 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
             if self.streamer._data_queue.get.call_count > 1:
                 self.streamer._terminated = True
                 raise queue.Empty
-            return test_data
+            return test_data, None, None
 
         self.streamer._data_queue.get.side_effect = audio_bytes_queue_side_effect
-        self.streamer._data_queue.get_nowait.side_effect = queue.Empty
 
-        result = list(self.streamer._synthesize_request_generator())
+        result = list(self.streamer._synthesize_request_generator(starting_text='hello'))
 
         self.assertEqual(self.streamer._data_queue.get.call_count, 2)
-        self.assertEqual(self.streamer._data_queue.task_done.call_count, 1)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].input.text, test_data)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].input.text, 'hello')
+        self.assertEqual(result[1].input.text, test_data)
 
     def test_speaker_plays_audio_data(self):
         mock_input_1 = MagicMock()
@@ -67,6 +67,15 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
             ]
         )
 
+        test_data = 'test audio data'
+
+        def audio_bytes_queue_side_effect(timeout):
+            if self.streamer._data_queue.get.call_count > 1:
+                self.streamer._terminated = True
+                raise queue.Empty
+            return test_data, None, None
+
+        self.streamer._data_queue.get.side_effect = audio_bytes_queue_side_effect
         self.streamer._data_queue.get_nowait.side_effect = queue.Empty
 
         self.streamer._speaker_thread_function()
@@ -92,14 +101,19 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
         self.streamer._player.play_data.side_effect = Exception("Test exception")
 
         # On exception, the stream is stopped
-        self.streamer._data_queue = MagicMock()
-        self.streamer._data_queue.get_nowait.side_effect = queue.Empty
+        test_data = 'test audio data'
+
+        def audio_bytes_queue_side_effect(timeout):
+            if self.streamer._data_queue.get.call_count > 1:
+                self.streamer._terminated = True
+                raise queue.Empty
+            return test_data, None, None
+
+        self.streamer._data_queue.get.side_effect = audio_bytes_queue_side_effect
 
         self.streamer._speaker_thread_function()
 
         self.streamer._player.play_data.assert_called_once()
-
-        self.streamer._data_queue.get_nowait.assert_called_once()
 
         self.assertFalse(self.streamer.is_speaking())
 
@@ -109,21 +123,26 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
         ]
 
         # On exception, the stream is stopped
-        self.streamer._data_queue = MagicMock()
-        self.streamer._data_queue.get_nowait.side_effect = queue.Empty
+        test_data = 'test audio data'
+
+        def audio_bytes_queue_side_effect(timeout):
+            if self.streamer._data_queue.get.call_count > 1:
+                self.streamer._terminated = True
+                raise queue.Empty
+            return test_data, None, None
+
+        self.streamer._data_queue.get.side_effect = audio_bytes_queue_side_effect
 
         self.streamer._speaker_thread_function()
 
         self.streamer._player.play_data.assert_not_called()
-
-        self.streamer._data_queue.get_nowait.assert_called_once()
 
         self.assertFalse(self.streamer.is_speaking())
 
     def test_speak_success(self):
         self.streamer.speak("Hello world")
 
-        self.streamer._data_queue.put.assert_called_once_with('Hello world')
+        self.streamer._data_queue.put.assert_called_once_with(('Hello world', None, {}))
 
     def test_speak_exception(self):
         # self.streamer._client.streaming_synthesize.side_effect = [
@@ -150,6 +169,38 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
 
         self.streamer._client.list_voices.assert_called_once()
         self.assertEqual(voices, expected_voices)
+
+
+@unittest.skip("Real-time streaming test")
+class TestGoogleTextToSpeechAudioStreamerReal(unittest.TestCase):
+    def setUp(self):
+        self.streamer = GoogleTextToSpeechAudioStreamer()
+
+    def tearDown(self):
+        del self.streamer
+
+    def test_speak(self):
+        self.streamer.speak("Hello world.")
+        self.streamer.speak("How are you doing? I hope you are doing well.")
+        self.streamer.speak("I am doing well, thank you for asking.")
+
+        time.sleep(2)
+
+        self.streamer.speak("Playing before stream timeout.")
+
+        time.sleep(6)
+
+        self.streamer.speak("Playing after stream timeout.", voice="en-GB-Journey-D", language_code="en-GB")
+
+        # time.sleep(0.5)
+
+        while self.streamer.is_speaking():
+            print('Waiting for stream to finish')
+            time.sleep(0.5)
+
+        self.assertFalse(self.streamer.is_speaking())
+
+        # time.sleep(10)
 
 
 if __name__ == '__main__':
