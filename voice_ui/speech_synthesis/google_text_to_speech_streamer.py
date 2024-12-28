@@ -1,77 +1,96 @@
 import itertools
 import logging
 import queue
-import threading
 from typing import Dict, List, Optional
 
+from google.api_core import exceptions
 from google.cloud import texttospeech
 
-from ..audio_io.player import Player
-from .text_to_speech_streamer import TextToSpeechAudioStreamer
+from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
 
-class GoogleTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
+class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
     def __init__(self):
-        self._stopped = False
-        self._speaking = False
-        self._lock = threading.Lock()
-
-        self._terminated = False
-        self._speaker_thread = threading.Thread(
-            target=self._speaker_thread_function,
-            daemon=True
-        )
-
         self._client = texttospeech.TextToSpeechClient()
-        self._player = Player()
-        self._audio_bytes_queue = queue.Queue()
+        self._input_timeout = 3
 
-        self._speaker_thread.start()
+        super().__init__()
 
     @staticmethod
     def name() -> str:
         return "google"
 
-    def __del__(self):
-        self.stop()
-        self._terminated = True
-        if self._speaker_thread.is_alive():
-            self._speaker_thread.join(timeout=5)
+    def available_voices(self, language_code: Optional[str] = None) -> List[Dict]:
+        return self._client.list_voices(language_code=language_code)
 
-    def _speaker_thread_function(self):
-        self._terminated = False
+    def _synthesize_request_generator(self, starting_text: str):
+        yield texttospeech.StreamingSynthesizeRequest(
+            input=texttospeech.StreamingSynthesisInput(text=starting_text)
+        )
 
         while not self._terminated:
             try:
-                audio_data = self._audio_bytes_queue.get(timeout=1)
+                (text, _, _) = self._data_queue.get(timeout=self._input_timeout)  # Google streaming TTS has a 5 second timeout on its input. This timeout has to be less than that.
+            except queue.Empty:
+                logging.debug('No more text to synthesize')
+                return
 
-                if self.is_stopped():
-                    continue
+            logging.debug(f'Transcribing text: "{text}"')
 
-                # logging.debug(f'Playing {len(audio_data)} bytes of audio data')
-                self._speaking = True
-                self._player.play_data(audio_data)
-                self._speaking = False
+            yield texttospeech.StreamingSynthesizeRequest(
+                input=texttospeech.StreamingSynthesisInput(text=text)
+            )
 
+    def _speaker_thread_function(self):
+        logging.debug('Starting TTS thread')
+        while not self._terminated:
+            try:
+                (text, voice, kwargs) = self._data_queue.get(timeout=self._input_timeout)
             except queue.Empty:
                 continue
-            except Exception as e:
+
+            try:
+                logging.debug(f'Transcribing text: "{text}"')
+
+                self._speaking = True
+
+                # Set the config for your stream. The first request must contain your config, and then each subsequent request must contain text.
+                config_request = texttospeech.StreamingSynthesizeRequest(
+                    streaming_config=texttospeech.StreamingSynthesizeConfig(
+                        # See https://cloud.google.com/text-to-speech/docs/voices for all voices.
+                        voice=texttospeech.VoiceSelectionParams(
+                            language_code=(kwargs or {}).get('language_code', "en-US"),
+                            name=voice if voice else "en-US-Journey-D",
+                        )
+                    )
+                )
+
+                streaming_responses = self._client.streaming_synthesize(
+                    requests=itertools.chain(
+                        [config_request],
+                        self._synthesize_request_generator(starting_text=text)
+                    )
+                )
+
+                for response in streaming_responses:
+                    if self.is_stopped():
+                        logging.debug('Stream is stopped. Leaving.')
+                        break
+
+                    self._player.play_data(response.audio_content)
+
                 self._speaking = False
+
+            except exceptions.GoogleAPIError as e:
+                logging.error(f'Google API error: {e}')
+
+            except Exception as e:
                 logging.error(f'Error while playing audio: {e}')
 
-    def stop(self):
-        with self._lock:
-            self._stopped = True
+            finally:
+                self._speaking = False
 
-    def is_stopped(self):
-        with self._lock:
-            return self._stopped
-
-    def is_speaking(self):
-        return self._speaking
-
-    def available_voices(self) -> List[Dict]:
-        return self._client.list_voices()
+        logging.debug('TTS thread finished')
 
     def speak(
         self,
@@ -83,40 +102,5 @@ class GoogleTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         with self._lock:
             self._stopped = False
 
-        try:
-            # See https://cloud.google.com/text-to-speech/docs/voices for all voices.
-            voice_selection_params = texttospeech.VoiceSelectionParams(
-                name=voice if voice else "en-US-Journey-D",
-                language_code=kwargs.get('language_code', "en-US"),
-            )
-
-            streaming_config = texttospeech.StreamingSynthesizeConfig(
-                voice=voice_selection_params
-            )
-
-            # Set the config for your stream. The first request must contain your config, and then each subsequent request must contain text.
-            config_request = texttospeech.StreamingSynthesizeRequest(
-                streaming_config=streaming_config
-            )
-
-            streaming_responses = self._client.streaming_synthesize(
-                requests=itertools.chain(
-                    [config_request],
-                    [
-                        texttospeech.StreamingSynthesizeRequest(
-                            input=texttospeech.StreamingSynthesisInput(text=text)
-                        )
-                    ]
-                )
-            )
-
-            for response in streaming_responses:
-                if self.is_stopped():
-                    logging.debug('Stream is stopped. Leaving.')
-                    break
-
-                self._audio_bytes_queue.put(response.audio_content)
-
-        except Exception as e:
-            self._speaking = False
-            logging.error(f'Error while playing audio: {e}')
+        logging.debug(f'Speaking text: "{text}"')
+        self._data_queue.put((text.strip(), voice, kwargs))

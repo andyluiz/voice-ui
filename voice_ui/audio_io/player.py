@@ -9,7 +9,7 @@ from .pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 class Player:
     def __init__(
         self,
-        format: int = 8,
+        format: int = pyaudio.paInt16,
         channels: int = 1,
         rate: int = 24_000,
         device_name: Optional[str] = None,
@@ -18,7 +18,6 @@ class Player:
         if device_name is not None:
             device_index = self.find_device_index(device_name)
 
-        self._chunk = 1024
         # Open an audio stream
         with no_alsa_and_jack_errors():
             self._audio_interface = pyaudio.PyAudio()
@@ -27,6 +26,7 @@ class Player:
             format=format,
             channels=channels,
             rate=rate,
+            frames_per_buffer=4096,
             output=True,
             output_device_index=device_index
         )
@@ -58,6 +58,9 @@ class Player:
         self,
         audio_data: bytes,
     ):
+        if len(audio_data) == 0:
+            return
+
         self._stream.write(audio_data)
 
     def play_file(
@@ -69,6 +72,8 @@ class Player:
         if device_name is not None:
             device_index = self.find_device_index(device_name)
 
+        chunk = 2048
+
         with wave.open(file_path, 'rb') as wf:
             stream = self._audio_interface.open(
                 format=self._audio_interface.get_format_from_width(wf.getsampwidth()),
@@ -78,7 +83,7 @@ class Player:
                 output_device_index=device_index
             )
 
-            while len(data := wf.readframes(self._chunk)):
+            while len(data := wf.readframes(chunk)):
                 stream.write(data)
 
         stream.stop_stream()

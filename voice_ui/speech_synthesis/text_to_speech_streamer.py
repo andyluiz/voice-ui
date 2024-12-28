@@ -8,6 +8,10 @@ class TextToSpeechAudioStreamer(ABC):
         pass
 
     @abstractmethod
+    def terminate(self):
+        pass
+
+    @abstractmethod
     def stop(self):
         pass
 

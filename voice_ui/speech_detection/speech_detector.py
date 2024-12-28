@@ -5,6 +5,7 @@ from abc import ABC
 from collections import deque
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
+from uuid import UUID, uuid4
 
 import pveagle
 
@@ -18,6 +19,8 @@ class SpeechEvent(ABC):
         if self.__class__ == SpeechEvent:
             raise TypeError('SpeechEvent is an abstract class and cannot be instantiated directly')
 
+        self._id = uuid4()
+
         for k, v in kwargs.items():
             if not hasattr(self, k):
                 setattr(self, k, v)
@@ -27,6 +30,10 @@ class SpeechEvent(ABC):
     @property
     def name(self) -> str:
         return self.__class__.__name__
+
+    @property
+    def id(self) -> UUID:
+        return self._id
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):

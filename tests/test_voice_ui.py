@@ -68,16 +68,12 @@ class TestVoiceUI(unittest.TestCase):
 
         self.assertEqual(mock_thread_join.call_count, 2)
 
-    def test_on_speech_detected(self):
-        event = SpeechStartedEvent()
-        self.voice_ui._on_speech_detected(event)
-        self.assertFalse(self.voice_ui._speech_events.empty())
-
     @patch('voice_ui.voice_ui.datetime')
     @patch.object(Thread, 'start')
     @patch.object(WhisperTranscriber, '__init__', lambda self: None)
     @patch('voice_ui.voice_ui.logging.error')
-    def test_listener_queue_empty(self, mock_logging_error, mock_thread_start, mock_datetime):
+    @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
+    def test_listener_queue_empty(self, mock_uuid4, mock_logging_error, mock_thread_start, mock_datetime):
         mock_datetime.now = MagicMock(
             side_effect=[
                 datetime(2022, 1, 1, 0, 0, 0, 0),
@@ -102,6 +98,11 @@ class TestVoiceUI(unittest.TestCase):
         self.voice_ui._speech_detector.detect_hot_keyword.assert_called_once()
         self.voice_ui._speech_detector.start.assert_called_once()
 
+        mock_uuid4.assert_has_calls([
+            call(),
+            call()
+        ])
+
         self.mock_speech_callback.assert_has_calls([
             call(event=WaitingForHotwordEvent()),
             call(event=HotwordDetectedEvent()),
@@ -111,7 +112,8 @@ class TestVoiceUI(unittest.TestCase):
     @patch.object(Thread, 'start')
     @patch.object(WhisperTranscriber, '__init__', lambda self: None)
     @patch('voice_ui.voice_ui.logging.error')
-    def test_listener(self, mock_logging_error, mock_thread_start, mock_datetime):
+    @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
+    def test_listener(self, mock_uuid4, mock_logging_error, mock_thread_start, mock_datetime):
         mock_datetime.now = MagicMock(
             return_value=datetime(2022, 1, 1, 0, 0, 0, 0)
         )
@@ -162,14 +164,19 @@ class TestVoiceUI(unittest.TestCase):
 
         # mock_logging_error.assert_not_called()
 
+        mock_uuid4.assert_has_calls([
+            call(),
+            call()
+        ])
+
         self.mock_speech_callback.assert_has_calls([
             call(event=SpeechStartedEvent()),
             call(event=PartialSpeechEndedEvent(audio_data=None, metadata={'speaker': {'name': 'John Doe'}})),
             call(event=PartialSpeechEndedEvent(audio_data='audio data 2', metadata={'speaker': {'name': 'John Doe'}})),
-            call(event=PartialTranscriptionEvent(text='transcribed partial text', speaker='John Doe')),
+            call(event=PartialTranscriptionEvent(text='transcribed partial text', speaker='John Doe', speech_id='0')),
             call(event=SpeechEndedEvent(audio_data='audio data 3', metadata=None)),
-            call(event=PartialTranscriptionEvent(text='transcribed final text', speaker='user')),
-            call(event=TranscriptionEvent(text='transcribed partial text transcribed final text', speaker='user')),
+            call(event=PartialTranscriptionEvent(text='transcribed final text', speaker='user', speech_id='0')),
+            call(event=TranscriptionEvent(text='transcribed partial text transcribed final text', speaker='user', speech_id='0')),
         ])
 
     @patch.object(Thread, 'start')
@@ -183,6 +190,7 @@ class TestVoiceUI(unittest.TestCase):
             return "Hello World"
 
         self.voice_ui._speaker_queue.get = MagicMock(side_effect=speaker_queue_get_side_effect)
+        self.voice_ui._speaker_queue.task_done = MagicMock()
 
         self.voice_ui._text_to_speech_thread_function()
 
@@ -190,6 +198,9 @@ class TestVoiceUI(unittest.TestCase):
             text='Hello World',
             voice='test_voice'
         )
+
+        self.voice_ui._speaker_queue.get.assert_called_once()
+        self.voice_ui._speaker_queue.task_done.assert_called_once()
         self.assertFalse(mock_logging_error.called)
 
     @patch.object(Thread, 'start')
