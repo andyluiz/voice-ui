@@ -48,15 +48,18 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
 
         self._speaker_thread.start()
 
+    def terminate(self):
+        self.stop()
+        self._terminated = True
+        if self._speaker_thread.is_alive():
+            self._speaker_thread.join(timeout=5)
+
     @staticmethod
     def name():
         return "passthrough"
 
     def __del__(self):
-        self.stop()
-        self._terminated = True
-        if self._speaker_thread.is_alive():
-            self._speaker_thread.join(timeout=5)
+        self.terminate()
 
     def _speaker_thread_function(self):
         self._terminated = False

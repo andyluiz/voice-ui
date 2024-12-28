@@ -210,8 +210,11 @@ class VoiceUI:
 
         self._terminated = True
 
+        # Stop the speech detector and TTS streamer
         self._speech_detector.stop()
+        self._tts_streamer.terminate()
 
+        # Wait for the threads to finish
         try:
             self._speech_events.put(MetaDataEvent())
             self._speech_event_handler_thread.join(timeout=timeout)
