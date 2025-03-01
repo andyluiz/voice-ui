@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod, abstractstaticmethod
 from ..audio_io.audio_data import AudioData
 
 
-class SpeechToTextTranscriber(ABC):
+class SpeechToTextTranscriber(ABC):  # pragma: no cover
 
     @abstractstaticmethod
     def name() -> str:

@@ -1,6 +1,8 @@
 import os
 import queue
+import time
 import unittest
+from collections import deque
 from datetime import datetime, timedelta
 from typing import KeysView
 from unittest.mock import MagicMock, call, patch
@@ -65,8 +67,8 @@ class TestHotwordDetector(unittest.TestCase):
         self.assertTrue(result)
 
 
-def mock_mic_stream_init(self, chunk):
-    self._rate = 16000
+def mock_mic_stream_init(self, rate, chunk):
+    self._rate = rate
     self._chunk = chunk
     self._buff = MagicMock()
     self._audio_interface = MagicMock()
@@ -75,53 +77,43 @@ def mock_mic_stream_init(self, chunk):
 
 class TestMicrophoneVADStream(unittest.TestCase):
 
-    @patch('pvcobra.create')
-    def setUp(self, mock_cobra_create):
-        self.mock_cobra = MagicMock(frame_length=512)
-        mock_cobra_create.return_value = self.mock_cobra
+    @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
+    def setUp(self, mock_vad_factory_create):
+        self.mock_vad = MagicMock(frame_length=512)
+        mock_vad_factory_create.return_value = self.mock_vad
 
         with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
             self.stream = MicrophoneVADStream()
 
-        self.assertEqual(self.stream._cobra, self.mock_cobra)
+        self.assertEqual(self.stream._vad, self.mock_vad)
 
-    @patch('pvcobra.create', return_value=MagicMock())
-    def test_init_with_audio_length_out_of_limits_negative(self, mock_create):
-        self.mock_cobra = mock_create
-        self.mock_cobra.return_value = MagicMock(frame_length=512)
+    @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
+    def test_init_with_audio_length_out_of_limits_negative(self, mock_vad_factory_create):
+        self.mock_vad = MagicMock(frame_length=512)
+        mock_vad_factory_create.return_value = self.mock_vad
 
         with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
-            self.stream = MicrophoneVADStream(pre_speech_audio_length=-1)
+            self.stream = MicrophoneVADStream(pre_speech_duration=-1)
 
-        self.assertEqual(self.stream._cobra, self.mock_cobra.return_value)
+        self.assertEqual(self.stream._vad, self.mock_vad)
         self.assertEqual(self.stream._pre_speech_queue.maxlen, 1)
-        self.mock_cobra.assert_called_once()
+        mock_vad_factory_create.assert_called_once()
 
-    @patch('pvcobra.create', return_value=MagicMock())
-    def test_init_with_audio_length_out_of_limits_high(self, mock_create):
-        self.mock_cobra = mock_create
-        self.mock_cobra.return_value = MagicMock(frame_length=512)
+    @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
+    def test_init_with_audio_length_out_of_limits_high(self, mock_vad_factory_create):
+        self.mock_vad = MagicMock(frame_length=512)
+        mock_vad_factory_create.return_value = self.mock_vad
 
         with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
-            self.stream = MicrophoneVADStream(pre_speech_audio_length=10)
+            self.stream = MicrophoneVADStream(pre_speech_duration=10)
 
-        self.assertEqual(self.stream._cobra, self.mock_cobra.return_value)
+        self.assertEqual(self.stream._vad, self.mock_vad)
         self.assertEqual(self.stream._pre_speech_queue.maxlen, 150)
-        self.mock_cobra.assert_called_once()
-
-    def test_delete(self):
-        self.stream._cobra.delete = MagicMock()
-        self.stream.__del__()
-        self.stream._cobra.delete.assert_called_once()
-
-    def test_exit(self):
-        self.stream._cobra.delete = MagicMock()
-        self.stream.__exit__(None, None, None)
-        self.stream._cobra.delete.assert_called_once()
+        mock_vad_factory_create.assert_called_once()
 
     def test_convert_data(self):
         byte_data = b'\x01\x02\x03\x04'
-        result = MicrophoneVADStream._convert_data(byte_data)
+        result = MicrophoneVADStream.convert_data(byte_data)
         self.assertEqual(result, [513, 1027])
 
     def test_timer_expired_with_no_timeout(self):
@@ -170,75 +162,91 @@ class TestMicrophoneVADStream(unittest.TestCase):
             if self.stream._buff.get.call_count % 2 == 0:
                 raise queue.Empty
             else:
-                return b'\x01\x01' * self.mock_cobra.frame_length
+                return b'\x01\x01' * self.mock_vad.frame_length
 
         self.stream._buff.get.side_effect = stream_side_effect
-        self.stream._threshold = 0.7
 
-        self.mock_cobra.process.return_value = 0.5  # Below threshold
+        self.mock_vad.process.return_value = False  # Below threshold
 
-        result, speaker_scores = self.stream.detect_speech(timeout=0.1)
+        result = list(self.stream.generator())
 
-        self.assertFalse(result)
-        self.assertEqual(speaker_scores, -1)
-        self.assertEqual(self.mock_cobra.process.call_count, 4)
+        self.assertListEqual(result, [])
+        self.assertEqual(self.mock_vad.process.call_count, 4)
+
+    def test_detect_speech(self):
+        def stream_side_effect(timeout=None):
+            if self.stream._buff.get.call_count >= 20:  # 4 is above_threshold
+                self.stream._closed = True
+
+            return bytes([self.stream._buff.get.call_count])
+
+        self.stream._pre_speech_queue = deque(maxlen=2)  # Limit pre_speech_queue to 2
+        self.stream._buff.get.side_effect = stream_side_effect
+        self.mock_vad.process.side_effect = [
+            False,  # 1
+            False,
+            False,
+            True,   # Speech started here. This plus two previous frames should be returned.
+            True,   # Speech in progress. This frame should be returned.
+            True,   # Speech in progress. This frame should be returned.
+            False,  # Speech stopped here.
+            False,
+            False,
+            False,  # 10 (\x0a)
+            True,   # Speech started here again. This plus two previous frames should be returned.
+            True,   # Speech in progress. This frame should be returned.
+            True,   # Speech in progress. This frame should be returned.
+            True,   # Speech in progress. This frame should be returned.
+            True,   # Speech in progress. This frame should be returned.
+            False,  # Speech stopped here.
+            False,
+            False,
+            False,
+            False,  # 20 (\x14)
+        ]
+
+        result = list(self.stream.generator())
+
+        self.assertListEqual(result, [b"\x02\x03\x04", b"\x05", b"\x06", b"", b"\x09\x0a\x0b", b"\x0c", b"\x0d", b"\x0e", b"\x0f", b""])
+        self.assertEqual(self.mock_vad.process.call_count, 20)
 
     def test_detect_speech_runtime_error(self):
         self.stream._buff.get.return_value = None
 
         with self.assertRaises(RuntimeError):
-            self.stream.detect_speech()
+            list(self.stream.generator())
 
-        self.mock_cobra.process.assert_not_called()
+        self.mock_vad.process.assert_not_called()
 
     def test_detect_speech_timeout(self):
         def stream_side_effect(timeout=None):
-            raise queue.Empty
+            time.sleep(0.002)
+
+            if self.stream._buff.get.call_count >= 2 * 4:  # 4 is above_threshold
+                self.stream._closed = True
+
+            if self.stream._buff.get.call_count % 2 == 0:
+                raise queue.Empty
+            else:
+                return b'\x01\x01' * self.mock_vad.frame_length
 
         self.stream._buff.get.side_effect = stream_side_effect
+        self.stream._detection_timeout = 0.001
+
+        self.mock_vad.process.return_value = False  # Below threshold
 
         with self.assertRaises(TimeoutError):
-            self.stream.detect_speech(timeout=0.01)
+            list(self.stream.generator())
 
-        self.mock_cobra.process.assert_not_called()
-
-    def test_detect_speech_with_voice_no_profiles(self):
-        self.stream._buff.get.return_value = b'\x01\x01' * self.mock_cobra.frame_length
-
-        self.mock_cobra.process.return_value = 0.8  # Above threshold
-
-        result, speaker_scores = self.stream.detect_speech(threshold=0.7)
-
-        self.assertTrue(result)
-        self.assertIsInstance(speaker_scores, list)
-        self.assertEqual(self.mock_cobra.process.call_count, 5)
-
-    @patch('pveagle.create_recognizer')
-    def test_detect_speech_with_voice_with_profiles(self, mock_create_recognizer):
-        self.stream._buff.get.return_value = b'\x01\x01' * self.mock_cobra.frame_length
-
-        mock_create_recognizer.return_value = MagicMock(frame_length=512)
-        mock_create_recognizer.return_value.process.return_value = [0.1, 0.3]
-
-        self.mock_cobra.process.return_value = 0.8  # Above threshold
-
-        result, speaker_scores = self.stream.detect_speech(timeout=0.1, speaker_profiles=['Speaker 1', 'Speaker 2'])
-
-        self.assertTrue(result)
-        self.assertIsInstance(speaker_scores, list)
-        self.assertEqual(speaker_scores, [0.1, 0.3])
-
-        self.assertEqual(self.mock_cobra.process.call_count, 5)
-        self.assertEqual(mock_create_recognizer.return_value.process.call_count, self.mock_cobra.process.call_count)
-        mock_create_recognizer.return_value.delete.assert_called_once()
+        self.assertEqual(self.mock_vad.process.call_count, 1)
 
     @patch('pvporcupine.create')
     @patch.object(HotwordDetector, 'process', return_value=-1)
     def test_detect_hot_keyword_no_keyword(self, mock_process, mock_porcupine_create):
         self.stream._buff.get.side_effect = [
-            b'\x00\x00' * self.mock_cobra.frame_length,
-            b'\x00\x00' * self.mock_cobra.frame_length,
-            b'\x00\x00' * self.mock_cobra.frame_length,
+            b'\x00\x00' * self.mock_vad.frame_length,
+            b'\x00\x00' * self.mock_vad.frame_length,
+            b'\x00\x00' * self.mock_vad.frame_length,
             None
         ]
 
@@ -252,7 +260,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
     def test_detect_hot_keyword_with_keyword(self, mock_process, mock_porcupine_create):
         self.stream._buff.get.side_effect = [
             queue.Empty,
-            b'\x00\x00' * self.mock_cobra.frame_length,
+            b'\x00\x00' * self.mock_vad.frame_length,
             None
         ]
 

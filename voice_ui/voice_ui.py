@@ -1,5 +1,4 @@
 import logging
-import os
 import queue
 import threading
 import time
@@ -51,10 +50,9 @@ class VoiceUI:
         # Voice input
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
-            pv_access_key=os.environ['PORCUPINE_ACCESS_KEY'],
             callback=lambda event: self._speech_events.put(event),
             speaker_profiles_dir=self._config.get('voice_profiles_dir'),
-            pre_speech_audio_length=self._config.get('pre_speech_audio_length', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
+            pre_speech_duration=self._config.get('pre_speech_duration', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
             post_speech_duration=self._config.get('post_speech_duration', 1.0),
             max_speech_duration=self._config.get('max_speech_duration', 10),
         )

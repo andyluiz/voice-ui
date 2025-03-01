@@ -5,19 +5,18 @@ import queue
 import struct
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict
 
-import pvcobra
-import pveagle
 import pvporcupine
 
 from ..audio_io.microphone import MicrophoneStream
+from ..voice_activity_detection.vad_factory import VADFactory
+from ..voice_activity_detection.vad_i import IVoiceActivityDetector
 
 
 class HotwordDetector():
     def __init__(
         self,
-        pv_access_key=None,
         keywords=None,
         sensitivities=None,
         additional_keyword_paths: Dict[str, str] = {},
@@ -34,7 +33,7 @@ class HotwordDetector():
 
         # Initialize Porcupine with the specified keyword file
         self._handle = pvporcupine.create(
-            access_key=pv_access_key,
+            access_key=os.environ['PORCUPINE_ACCESS_KEY'],
             # model_path=os.path.abspath('src/resources/porcupine/porcupine_params_pt.pv'),
             keyword_paths=selected_keyword_paths,
             # keywords=keywords,
@@ -69,19 +68,28 @@ class HotwordDetector():
 class MicrophoneVADStream(MicrophoneStream):
     def __init__(
         self,
-        pv_access_key=None,
         threshold: float = 0.7,
-        pre_speech_audio_length: float = 0.25,  # seconds
+        pre_speech_duration: float = 0.2,  # seconds
+        post_speech_duration: float = 0.5,  # seconds
+        vad_engine: str = "SileroVAD",
+        detection_timeout: float = None,  # seconds
     ):
-        if pv_access_key is None:
-            pv_access_key = os.environ['PORCUPINE_ACCESS_KEY']
-        self._pv_access_key = pv_access_key
+        """Initialize the MicrophoneVADStream.
+
+        Args:
+            threshold (float, optional): Voice activity detection confidence threshold. Defaults to 0.7.
+            pre_speech_duration (float, optional): Length in seconds of audio to keep before speech is detected. Defaults to 0.25.
+            vad_engine (str, optional): Voice activity detection engine to use. Possible options are 'PicoVoiceVAD',
+                                        'FunASRVAD' and 'SileroVAD'. Defaults to "SileroVAD".
+        """
         self._threshold = threshold
-        self._pre_speech_audio_length = pre_speech_audio_length
+        self._pre_speech_duration = pre_speech_duration
+        self._post_speech_duration = post_speech_duration
+        self._detection_timeout = detection_timeout
 
-        self._cobra = pvcobra.create(access_key=pv_access_key)
+        self._vad: IVoiceActivityDetector = VADFactory.create(vad_engine)
 
-        super().__init__(chunk=self._cobra.frame_length)
+        super().__init__(rate=16000, chunk=self._vad.frame_length)
 
         def clamp(value, min, max):
             if value < min:
@@ -91,21 +99,12 @@ class MicrophoneVADStream(MicrophoneStream):
             else:
                 return value
 
-        self._pre_speech_audio_chunk_count = clamp(self._convert_duration_to_chunks(self._pre_speech_audio_length), 1, 150)
+        self._pre_speech_audio_chunk_count = clamp(self.convert_duration_to_chunks(self._pre_speech_duration), 1, 150)
         logging.debug(f'Pre speech audio chunk count: {self._pre_speech_audio_chunk_count}')
         self._pre_speech_queue = deque(maxlen=self._pre_speech_audio_chunk_count)
 
-    def __del__(self):
-        if hasattr(self, '_cobra') and self._cobra is not None:
-            self._cobra.delete()
-
-    def __exit__(self, type, value, traceback):
-        super().__exit__(type, value, traceback)
-
-        self._cobra.delete()
-
     @staticmethod
-    def _convert_data(byte_data):
+    def convert_data(byte_data):
         int16_values = struct.unpack(f"{len(byte_data) // 2}h", byte_data)
         int16_list = list(int16_values)
         return int16_list
@@ -126,7 +125,7 @@ class MicrophoneVADStream(MicrophoneStream):
         super().pause()
         self._pre_speech_queue.clear()
 
-    def _get_chunk_from_buffer(self):
+    def _get_chunk_from_buffer(self) -> bytes:
         # Consume one chunk from the buffer
         chunk = self._buff.get(timeout=0.05)
         if chunk is not None:
@@ -134,75 +133,14 @@ class MicrophoneVADStream(MicrophoneStream):
 
         return chunk
 
-    def _convert_duration_to_chunks(self, duration: float) -> int:
+    def convert_duration_to_chunks(self, duration: float) -> int:
         return int(math.ceil(duration * self._rate / self._chunk))
-
-    def detect_speech(
-        self,
-        threshold: int = None,
-        timeout: int = None,
-        speaker_profiles: List[pveagle.EagleProfile] = None,
-    ):
-        if threshold is None:
-            threshold = self._threshold
-
-        eagle = None
-        if speaker_profiles:
-            eagle = pveagle.create_recognizer(access_key=self._pv_access_key, speaker_profiles=speaker_profiles)
-            assert eagle.frame_length == self._cobra.frame_length
-
-        above_threshold_counter = 0
-        start_time = datetime.now()
-
-        self.resume()
-        while not self._closed:
-            if self._timer_expired(start_time=start_time, timeout=timeout):
-                self.pause()
-                raise TimeoutError('Timeout')
-
-            try:
-                # Consume one chunk from the buffer
-                chunk = self._get_chunk_from_buffer()
-                if chunk is None:
-                    raise RuntimeError('Chunk is none')
-                    break
-
-                audio_frame = self._convert_data(chunk)
-                voice_probability = self._cobra.process(audio_frame)
-
-                speaker_scores = []
-                if eagle is not None:
-                    speaker_scores = eagle.process(audio_frame)
-
-                if voice_probability > threshold:
-                    above_threshold_counter += 1
-                    # print('\rVoice Probability: {:.2f} %, above_threshold_counter: {}'.format(voice_probability, above_threshold_counter))
-                else:
-                    above_threshold_counter = 0
-
-                if above_threshold_counter > 4:
-                    # Determine speaker
-                    if eagle is not None:
-                        eagle.delete()
-
-                    # Keep the stream running to collect all the next frames, and return
-                    return True, speaker_scores
-
-            except queue.Empty:
-                # Queue is empty, this is expected, continue
-                continue
-
-        self.pause()
-        if eagle is not None:
-            eagle.delete()
-        return False, -1
 
     def detect_hot_keyword(
         self,
         additional_keyword_paths: Dict[str, str] = {},
     ):
         hotword_detector = HotwordDetector(
-            pv_access_key=self._pv_access_key,
             additional_keyword_paths=additional_keyword_paths
         )
 
@@ -215,7 +153,7 @@ class MicrophoneVADStream(MicrophoneStream):
                     raise RuntimeError('Chunk is none')
                     break
 
-                audio_frame = self._convert_data(chunk)
+                audio_frame = self.convert_data(chunk)
                 keyword_index = hotword_detector.process(audio_frame)
 
                 if keyword_index >= 0:
@@ -230,8 +168,59 @@ class MicrophoneVADStream(MicrophoneStream):
         return False
 
     def generator(self):
-        if len(self._pre_speech_queue) > 0:
-            data = b"".join(self._pre_speech_queue)
-            yield from self._yield_bytes(data, self._max_bytes_per_yield)
+        start_time = datetime.now()
+        cache = {}
+        speech_in_progress: bool = False
 
-        yield from super().generator()
+        # Start the stream
+        self.resume()
+
+        # Keep running this loop until the stream is closed
+        while not self._closed:
+            try:
+                # Consume one chunk from the buffer
+                chunk = self._buff.get(timeout=0.1)
+                if chunk is None:
+                    raise RuntimeError('Chunk is none')
+                    break
+
+                vad_res = self._vad.process(
+                    chunk,
+                    cache=cache,
+                    threshold=self._threshold,
+                    pre_speech_duration=self._pre_speech_duration,
+                    post_speech_duration=self._post_speech_duration,
+                )
+
+                # Check if the speech has started
+                if not speech_in_progress and vad_res:
+                    speech_in_progress = True
+
+                    chunk = b"".join(self._pre_speech_queue) + chunk
+                    self._pre_speech_queue.clear()
+
+                # Check if the speech has ended
+                if speech_in_progress and not vad_res:
+                    speech_in_progress = False
+
+                    # Yield an empty byte string to signal the end of the speech
+                    yield b""
+
+                if speech_in_progress:
+                    # Reset the start time to prevent timeout
+                    start_time = datetime.now()
+
+                    yield chunk
+                else:
+                    self._pre_speech_queue.append(chunk)
+
+            except queue.Empty:
+                # Queue is empty, this is expected, continue
+                pass
+
+            if self._timer_expired(start_time=start_time, timeout=self._detection_timeout):
+                self.pause()
+                raise TimeoutError('Timeout')
+
+        # Stop the stream
+        self.pause()

@@ -56,7 +56,7 @@ def process_event(event):
             "type": "conversation.item.truncate",
             "item_id": status['playing_item_id'],
             "content_index": 0,
-            "audio_end_ms": int((voice_ui._tts_streamer.spoken_time - status['response_start_time']) * 1000),
+            # "audio_end_ms": int((voice_ui._tts_streamer.spoken_time - status['response_start_time']) * 1000),
         }
 
         logging.info(f"Truncating item ID: {status['playing_item_id']}")
@@ -132,14 +132,14 @@ def on_message(ws, message):
 
     if event.get("type") == "response.created":
         status['in_progress'] = (event.get("status") == "in_progress")
-        status['response_start_time'] = voice_ui._tts_streamer.spoken_time
+        # status['response_start_time'] = voice_ui._tts_streamer.spoken_time
 
     elif event.get("type") == "response.audio.delta":
         audio_delta_base64 = event.get("delta")
 
         audio_data = base64.b64decode(audio_delta_base64.encode('utf-8'))
 
-        logging.info(f"Spoken time: {voice_ui._tts_streamer.spoken_time}")
+        # logging.info(f"Spoken time: {voice_ui._tts_streamer.spoken_time}")
         voice_ui.speak(audio_data)
 
     elif event.get("type") == "response.audio.done":

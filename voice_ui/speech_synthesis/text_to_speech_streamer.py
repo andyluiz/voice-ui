@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod, abstractstaticmethod
 from typing import Dict, List
 
 
-class TextToSpeechAudioStreamer(ABC):
+class TextToSpeechAudioStreamer(ABC):  # pragma: no cover
     @abstractstaticmethod
     def name(self):
         pass

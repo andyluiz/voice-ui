@@ -1,6 +1,5 @@
 colorama
 openai
-pvcobra
 pveagle
 pvporcupine
 pvrecorder
@@ -12,6 +11,14 @@ google-cloud-speech
 google-cloud-texttospeech
 sox
 pydub
+# websocket-client
+
+# VADs
+pvcobra
+silero-vad  # Silero VAD
+funasr  # FunASR
+torch>=1.13  # FunASR dependency
+torchaudio  # FunASR dependency
 
 # Tools
 black

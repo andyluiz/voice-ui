@@ -7,14 +7,14 @@ from six.moves import queue
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
-from voice_ui.speech_recognition.speech_detector import (
+from voice_ui.speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
+from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
 
 dotenv.load_dotenv()
 
@@ -44,12 +44,10 @@ def process_event():
         )
         print(f"{Fore.BLUE}Speaker: {metadata.get('speaker')}{Fore.RESET}")
 
-        response = whisper.transcribe(
+        transcription = whisper.transcribe(
             audio_data=audio_data,
             prompt=transcriptions[-1] if len(transcriptions) > 0 else None,
         )
-
-        transcription = response.text
 
         if isinstance(event, SpeechEndedEvent) or len(transcriptions) == 0:
             transcriptions.append(transcription)
@@ -59,15 +57,7 @@ def process_event():
             print(transcription)
 
     elif isinstance(event, MetaDataEvent):
-        max_size = len("Voice Probability: {}".format(100 * "#"))
-        print(
-            " " * max_size
-            + "\rVoice Probability: {}".format(
-                int(metadata["voice_probability"] * 100) * "#"
-            ),
-            end="\r",
-            flush=True,
-        )
+        # print(metadata)
         pass
     else:
         raise Exception("Unknown event: {}".format(event))
@@ -75,23 +65,25 @@ def process_event():
 
 # Main function
 def main():
-    try:
-        speech_detector = SpeechDetector(
-            pv_access_key=os.environ["PORCUPINE_ACCESS_KEY"],
-            callback=lambda event: events.put(event),
-        )
+    print('Creating speech detector...')
+    speech_detector = SpeechDetector(
+        callback=lambda event: events.put(event),
+    )
 
-        # Detect speech
-        speech_detector.start()
+    # Detect speech
+    print('Listening for speech...')
+    speech_detector.start()
 
-        while True:
+    while True:
+        try:
             process_event()
-    except queue.Empty:
-        pass
-    except (EOFError, KeyboardInterrupt):
-        pass
-    finally:
-        speech_detector.stop()
+        except queue.Empty:
+            pass
+        except (EOFError, KeyboardInterrupt):
+            break
+
+    print('Stopping...')
+    speech_detector.stop()
 
 
 if __name__ == "__main__":

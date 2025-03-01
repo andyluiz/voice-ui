@@ -1,5 +1,4 @@
 # import logging
-import os
 import unittest
 import wave
 
@@ -78,7 +77,6 @@ class TestSpeechDetector(unittest.TestCase):
                 raise Exception("Unknown event: {}".format(event))
 
         self.speech_detector = SpeechDetector(
-            pv_access_key=os.environ['PORCUPINE_ACCESS_KEY'],
             callback=lambda event: events.put(event),
             post_speech_duration=1.0,
             # max_speech_duration=10,

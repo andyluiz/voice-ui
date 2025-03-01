@@ -85,6 +85,9 @@ def main():
         except (EOFError, KeyboardInterrupt):
             break
 
+    print(f"{Fore.MAGENTA}Terminating...{Fore.RESET}")
+    voice_ui.terminate()
+
 
 if __name__ == "__main__":
     main()

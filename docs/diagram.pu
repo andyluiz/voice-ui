@@ -6,50 +6,108 @@ skin rose
 set namespaceSeparator .
 skinparam MaxMessageSize 50
 
-package "ui" as ui {
-   package "voice" as voice {
-      component VoiceUI
-      component SpeechDetector
-      component TextToSpeechAudioStreamer
+package voice_ui {
+   component VoiceUI
+
+   package speech_detection {
+      component speech_detector.SpeechDetector
       package vad_microphone {
          component MicrophoneVADStream
          component HotwordDetector
       }
-      component SpeakerProfileManager
-      component WhisperTranscriber
+      component speaker_profile_manager.SpeakerProfileManager
+   }
+
+   package speech_recognition {
+      component speech_to_text_transcriber_factory.SpeechToTextTranscriberFactory
+      component speech_to_text_transcriber.SpeechToTextTranscriber
+
+      SpeechToTextTranscriberFactory -> SpeechToTextTranscriber
+
+      component openai_whisper.WhisperTranscriber
+      component openai_local_whisper.LocalWhisperTranscriber
+
+      SpeechToTextTranscriber <|.. WhisperTranscriber
+      SpeechToTextTranscriber <|.. LocalWhisperTranscriber
+      SpeechToTextTranscriberFactory --> WhisperTranscriber
+      SpeechToTextTranscriberFactory --> LocalWhisperTranscriber
+   }
+
+   package speech_synthesis {
+      component text_to_speech_streamer.TextToSpeechAudioStreamer
+      component text_to_speech_streamer_factory.TextToSpeechAudioStreamerFactory
+
+      TextToSpeechAudioStreamerFactory -> TextToSpeechAudioStreamer
+
+      component pass_through_text_to_speech_streamer.PassThroughTextToSpeechAudioStreamer
+      component google_text_to_speech_streamer.GoogleTextToSpeechAudioStreamer
+      component open_ai_text_to_speech_streamer.OpenAITextToSpeechAudioStreamer
+
+      TextToSpeechAudioStreamer <|.. PassThroughTextToSpeechAudioStreamer
+      PassThroughTextToSpeechAudioStreamer <|-- GoogleTextToSpeechAudioStreamer
+      PassThroughTextToSpeechAudioStreamer <|-- OpenAITextToSpeechAudioStreamer
+
+      TextToSpeechAudioStreamerFactory --> GoogleTextToSpeechAudioStreamer
+      TextToSpeechAudioStreamerFactory --> OpenAITextToSpeechAudioStreamer
+      TextToSpeechAudioStreamerFactory --> PassThroughTextToSpeechAudioStreamer
+   }
+
+   package audio_io {
+      component audio_data.AudioData
+      component microphone.MicrophoneStream
+      component player.Player
+   }
+
+   package voice_activity_detection {
+      component vad_i.IVoiceActivityDetector
+      component vad_factory.VADFactory
+
+      VADFactory -> IVoiceActivityDetector
+
+      component vad_picovoice.PicoVoiceVAD
+      component vad_funasr.FunASRVAD
+      component vad_silero.SileroVAD
+
+      IVoiceActivityDetector <|.. PicoVoiceVAD
+      IVoiceActivityDetector <|.. FunASRVAD
+      IVoiceActivityDetector <|.. SileroVAD
+
+      VADFactory --> PicoVoiceVAD
+      VADFactory --> FunASRVAD
+      VADFactory --> SileroVAD
    }
 }
 
-package "utils" as utils {
-   package microphone {
-      component MicrophoneStream
-   }
-}
 
 VoiceUI --* SpeechDetector
-VoiceUI --o WhisperTranscriber: transcribe()
-VoiceUI -left-* TextToSpeechAudioStreamer: speak(), stop()
+VoiceUI --> SpeechToTextTranscriberFactory: create()
+VoiceUI --o SpeechToTextTranscriber: transcribe()
+VoiceUI --* TextToSpeechAudioStreamer: speak(), stop()
+VoiceUI --> TextToSpeechAudioStreamerFactory: create()
 
-TextToSpeechAudioStreamer --o [requests]
-TextToSpeechAudioStreamer --o [utils.player.Player]: play_data()
+PassThroughTextToSpeechAudioStreamer --o Player: play_data()
+' OpenAITextToSpeechAudioStreamer --o [requests]
+' GoogleTextToSpeechAudioStreamer --o [google]
 
 SpeechDetector --o SpeakerProfileManager: load_profiles()
-SpeechDetector --|> MicrophoneVADStream: extends
-SpeechDetector --* [pveagle.Eagle]: create_recognizer()
+SpeechDetector --* MicrophoneVADStream: resume(), stop(), generator()
+SpeechDetector --* [picovoice.pveagle.Eagle]: create_recognizer()
 
-SpeakerProfileManager --o [pveagle.EagleProfiler]: create_profiler()
-SpeakerProfileManager --o [pveagle.EagleProfile]: from_bytes()
-SpeakerProfileManager --o [pvrecorder.PvRecorder]: start(), read(), stop(), delete()
+SpeakerProfileManager --o [picovoice.pveagle.EagleProfiler]: create_profiler()
+SpeakerProfileManager --o [picovoice.pveagle.EagleProfile]: from_bytes()
+SpeakerProfileManager --o [picovoice.pvrecorder.PvRecorder]: start(), read(), stop(), delete()
 
-MicrophoneVADStream --* [pvcobra.Cobra]: process(), delete()
-MicrophoneVADStream --* [pveagle.Eagle]: process(), delete()
-MicrophoneVADStream --o [pveagle.EagleProfiler]
-MicrophoneVADStream --|> [utils.microphone.MicrophoneStream]
+MicrophoneStream <|-- MicrophoneVADStream
+MicrophoneVADStream --> VADFactory: create()
+MicrophoneVADStream --* IVoiceActivityDetector: process()
+MicrophoneVADStream --* [picovoice.pveagle.Eagle]: process(), delete()
+MicrophoneVADStream --o [picovoice.pveagle.EagleProfiler]
+MicrophoneVADStream -> HotwordDetector: detect_hot_keyword()
 
-[utils.microphone.MicrophoneStream] --* [pyaudio.PyAudio]
-[utils.player.Player] --* [pyaudio.PyAudio]
+MicrophoneStream --* [pyaudio.PyAudio]
+Player --* [pyaudio.PyAudio]
 
-HotwordDetector --* [pvporcupine.Porcupine]
+HotwordDetector --* [picovoice.pvporcupine.Porcupine]
 
 [plugins.voice_profiler.VoiceProfileManager] --* SpeakerProfileManager: load_profile(), create_profile(), list_profiles()
 
@@ -58,5 +116,8 @@ note top of [plugins.voice_profiler.VoiceProfileManager]
 end note
 
 WhisperTranscriber --* [openai.OpenAI]
+
+
+' PicoVoiceVAD --* [picovoice.pvcobra.Cobra]: process(), delete()
 
 @enduml
