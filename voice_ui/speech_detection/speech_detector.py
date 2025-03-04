@@ -1,12 +1,9 @@
 import logging
-import os
 import threading
 from abc import ABC
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable
 from uuid import UUID, uuid4
-
-import pveagle
 
 from ..audio_io.audio_data import AudioData
 from .speaker_profile_manager import SpeakerProfileManager
@@ -95,40 +92,22 @@ class SpeechDetector:
         self._max_speech_duration = max_speech_duration
 
         self._speaker_profiles_dir = speaker_profiles_dir
-        self._speaker_profiles = []
-        self._eagle_recognizer = None
+        self._profile_manager = None
         self._thread = None
 
-    def stop(self):
-        self._mic_stream.pause()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
-            self._thread = None
-
-        if self._eagle_recognizer is not None:
-            self._eagle_recognizer.delete()
-            self._eagle_recognizer = None
-
     def start(self):
-        self._speaker_profiles = []
-        if self._speaker_profiles_dir:
-            logging.info(f'Loading speaker profiles from {self._speaker_profiles_dir}')
-            self._speaker_profiles = SpeakerProfileManager(self._speaker_profiles_dir).load_profiles()
-            logging.info(f'Loaded {len(self._speaker_profiles)} speaker profiles')
-
-        if self._eagle_recognizer is not None:
-            self._eagle_recognizer.delete()
-            self._eagle_recognizer = None
-
-        if self._speaker_profiles:
-            self._eagle_recognizer = pveagle.create_recognizer(
-                access_key=os.environ['PORCUPINE_ACCESS_KEY'],
-                speaker_profiles=list(map(lambda x: x["profile_data"], self._speaker_profiles))
-            )
-            assert self._eagle_recognizer.frame_length == self._mic_stream.chunk_size, "Frame length mismatch"
+        self._profile_manager = SpeakerProfileManager(self._speaker_profiles_dir) if self._speaker_profiles_dir else None
 
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+
+    def stop(self):
+        self._mic_stream.pause()
+
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
+
+        self._profile_manager = None
 
     def _run(self):
         logging.debug('Speech detector thread started')
@@ -142,7 +121,7 @@ class SpeechDetector:
 
         # Initialize counters and flags
         self.collected_chunks = []
-        self.speaker_scores = [0] * len(self._speaker_profiles)
+        self.speaker_scores = []
 
         # Resume audio stream
         self._mic_stream.resume()
@@ -162,17 +141,13 @@ class SpeechDetector:
                     speech_detected = True
                     self._handle_speech_start()
 
-                if self.speaker_scores:
-                    # Convert raw data chunk to audio frame
+                if self._profile_manager:
                     audio_frame = self._mic_stream.convert_data(chunk)
 
-                    scores = self._detect_speaker(audio_frame)
+                    scores = self._profile_manager.detect_speaker(audio_frame)
                     if scores:
-                        if len(scores) == len(self.speaker_scores):
-                            self.speaker_scores = list(map(lambda x, y: x + y, self.speaker_scores, scores))
-                            logging.debug(f"Speaker ID: {self._get_speaker_name(scores)}")
-                        else:
-                            logging.warning(f"Speaker scores length mismatch: {len(scores)} != {len(self.speaker_scores)}")
+                        self.speaker_scores.append(scores)
+                        logging.debug(f"Speaker ID: {self._profile_manager.get_speaker_name(scores)}")
 
                 # Collect chunks during speech detection
                 self.collected_chunks.append(chunk)
@@ -192,39 +167,6 @@ class SpeechDetector:
 
         logging.debug('Speech detector thread finished')
 
-    def _get_speaker_name(self, scores: List[float]) -> Optional[Tuple[str, int, float]]:
-        if not scores:
-            return None
-
-        # Find the speaker by returning the index of the with the highest score
-        speaker_id, score = max(enumerate(scores), key=lambda x: x[1])
-        if score < 0.2:
-            return None
-
-        speaker_name = list(map(lambda x: x["name"], self._speaker_profiles))[speaker_id]
-
-        return {
-            "name": speaker_name,
-            "id": speaker_id,
-            "score": score,
-        }
-
-    def _detect_speaker(self, audio_frame) -> Optional[Tuple[str, int, float]]:
-        if self._eagle_recognizer is None:
-            logging.error("Eagle recognizer is not initialized")
-            return None
-
-        if self._eagle_recognizer.frame_length != len(audio_frame):
-            logging.error(f"Frame length mismatch: {self._eagle_recognizer.frame_length} != {len(audio_frame)}")
-            return None
-
-        scores = self._eagle_recognizer.process(audio_frame)
-        if not scores:
-            logging.debug("No speaker detected")
-            return None
-
-        return scores
-
     def _handle_speech_start(self):
         """
         Handle the start of speech detection.
@@ -240,9 +182,13 @@ class SpeechDetector:
         logging.debug("Speech end detected")
 
         # Find the speaker
-        speaker_sum = sum(self.speaker_scores)
-        scores = list(map(lambda x: (x / speaker_sum) if speaker_sum > 0 else 0, self.speaker_scores))
-        speaker_info = self._get_speaker_name(scores)
+        speaker_info = None
+        if self._profile_manager:
+            # Calculate the average scores for each speaker
+            scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+
+            # Get the speaker with the highest average score
+            speaker_info = self._profile_manager.get_speaker_name(scores)
 
         self._callback(
             event=SpeechEndedEvent(
@@ -258,7 +204,7 @@ class SpeechDetector:
             )
         )
         self.collected_chunks.clear()
-        self.speaker_scores = [0] * len(self._speaker_profiles)
+        self.speaker_scores.clear()
 
     def _handle_collected_chunks_overflow(self, max_chunks):
         """
@@ -266,9 +212,14 @@ class SpeechDetector:
         """
         n_collected_chunks = len(self.collected_chunks)
         if n_collected_chunks > int(0.8 * max_chunks) or n_collected_chunks > int(1.2 * max_chunks):
-            speaker_sum = sum(self.speaker_scores)
-            scores = list(map(lambda x: (x / speaker_sum) if speaker_sum > 0 else 0, self.speaker_scores))
-            speaker_info = self._get_speaker_name(scores)
+            # Find the speaker
+            speaker_info = None
+            if self._profile_manager:
+                # Calculate the average scores for each speaker
+                scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+
+                # Get the speaker with the highest average score
+                speaker_info = self._profile_manager.get_speaker_name(scores)
 
             self._callback(
                 event=PartialSpeechEndedEvent(
@@ -284,4 +235,4 @@ class SpeechDetector:
                 )
             )
             self.collected_chunks.clear()
-            self.speaker_scores = [0] * len(self._speaker_profiles)
+            self.speaker_scores.clear()

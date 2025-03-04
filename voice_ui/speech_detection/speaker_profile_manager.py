@@ -1,6 +1,7 @@
+import logging
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Tuple
 
 import pveagle
 import pvrecorder
@@ -11,8 +12,21 @@ DEFAULT_DEVICE_INDEX = -1
 class SpeakerProfileManager:
     def __init__(self, profile_dir: Path):
         self._profile_dir = profile_dir
+        self._eagle_recognizer = None
+
         if not self._profile_dir.exists():
-            raise ValueError(f"Profile directory '{self._profile_dir}' does not exist")
+            raise FileNotFoundError(f"Voice profile directory '{self._profile_dir}' does not exist")
+
+        self._speaker_profiles = self._load_profiles()
+
+        self._eagle_recognizer = pveagle.create_recognizer(
+            access_key=os.environ['PORCUPINE_ACCESS_KEY'],
+            speaker_profiles=list(map(lambda x: x["profile_data"], self._speaker_profiles))
+        )
+
+    def __del__(self):
+        if self._eagle_recognizer:
+            self._eagle_recognizer.delete()
 
     def create_profile(self, profile_name: str):
         profile_path = self._profile_dir / f"{profile_name}.bin"
@@ -51,14 +65,12 @@ class SpeakerProfileManager:
 
         eagle_profiler.delete()
 
-    def list_profiles(self):
-        profiles = [file.stem for file in self._profile_dir.glob("*.bin")]
-        return profiles
+    @property
+    def profiles(self):
+        return [profile["name"] for profile in self._speaker_profiles]
 
-    def load_profiles(self) -> List[dict]:
-        if not self._profile_dir.exists():
-            raise FileNotFoundError(f"Voice profile directory '{self._profile_dir}' does not exist")
-
+    def _load_profiles(self) -> List[dict]:
+        logging.info(f'Loading speaker profiles from {self._profile_dir}')
         profiles = []
         for file in self._profile_dir.glob("*.bin"):
             with open(file.absolute(), "rb") as f:
@@ -69,4 +81,48 @@ class SpeakerProfileManager:
                     }
                 )
 
+        logging.info(f'Loaded {len(profiles)} speaker profiles')
         return profiles
+
+    def detect_speaker(self, audio_frames: List[float]) -> Optional[List[float]]:
+        if self._eagle_recognizer is None:
+            logging.error("Eagle recognizer is not initialized")
+            return None
+
+        # Split the audio frames into chunks of frame_length
+        scores = []
+        for i in range(0, len(audio_frames), self._eagle_recognizer.frame_length):
+            audio_frame = audio_frames[i:i + self._eagle_recognizer.frame_length]
+
+            if self._eagle_recognizer.frame_length != len(audio_frame):
+                continue
+
+            frame_scores = self._eagle_recognizer.process(audio_frame)
+            if frame_scores:
+                scores.append(frame_scores)
+
+        # Calculate the average scores for each speaker
+        scores = [sum(s) / len(s) for s in zip(*scores)]
+
+        if not scores:
+            logging.debug("No speaker detected")
+            return None
+
+        return scores
+
+    def get_speaker_name(self, scores: List[float]) -> Optional[Tuple[str, int, float]]:
+        if not scores:
+            return None
+
+        # Find the speaker by returning the index of the with the highest score
+        speaker_id, score = max(enumerate(scores), key=lambda x: x[1])
+        if score < 0.2:
+            return None
+
+        speaker_name = self.profiles[speaker_id]
+
+        return {
+            "name": speaker_name,
+            "id": speaker_id,
+            "score": score,
+        }
