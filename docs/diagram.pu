@@ -22,7 +22,7 @@ package voice_ui {
       component speech_to_text_transcriber_factory.SpeechToTextTranscriberFactory
       component speech_to_text_transcriber.SpeechToTextTranscriber
 
-      SpeechToTextTranscriberFactory -> SpeechToTextTranscriber
+      SpeechToTextTranscriberFactory .> SpeechToTextTranscriber
 
       component openai_whisper.WhisperTranscriber
       component openai_local_whisper.LocalWhisperTranscriber
@@ -37,7 +37,7 @@ package voice_ui {
       component text_to_speech_streamer.TextToSpeechAudioStreamer
       component text_to_speech_streamer_factory.TextToSpeechAudioStreamerFactory
 
-      TextToSpeechAudioStreamerFactory -> TextToSpeechAudioStreamer
+      TextToSpeechAudioStreamerFactory .> TextToSpeechAudioStreamer
 
       component pass_through_text_to_speech_streamer.PassThroughTextToSpeechAudioStreamer
       component google_text_to_speech_streamer.GoogleTextToSpeechAudioStreamer
@@ -62,7 +62,7 @@ package voice_ui {
       component vad_i.IVoiceActivityDetector
       component vad_factory.VADFactory
 
-      VADFactory -> IVoiceActivityDetector
+      VADFactory .> IVoiceActivityDetector
 
       component vad_picovoice.PicoVoiceVAD
       component vad_funasr.FunASRVAD
@@ -78,7 +78,6 @@ package voice_ui {
    }
 }
 
-
 VoiceUI --* SpeechDetector
 VoiceUI --> SpeechToTextTranscriberFactory: create()
 VoiceUI --o SpeechToTextTranscriber: transcribe()
@@ -89,7 +88,7 @@ PassThroughTextToSpeechAudioStreamer --o Player: play_data()
 ' OpenAITextToSpeechAudioStreamer --o [requests]
 ' GoogleTextToSpeechAudioStreamer --o [google]
 
-SpeechDetector --o SpeakerProfileManager: load_profiles()
+SpeechDetector --* SpeakerProfileManager: load_profiles()
 SpeechDetector --* MicrophoneVADStream: resume(), stop(), generator()
 SpeechDetector --* [picovoice.pveagle.Eagle]: create_recognizer()
 
@@ -102,7 +101,7 @@ MicrophoneVADStream --> VADFactory: create()
 MicrophoneVADStream --* IVoiceActivityDetector: process()
 MicrophoneVADStream --* [picovoice.pveagle.Eagle]: process(), delete()
 MicrophoneVADStream --o [picovoice.pveagle.EagleProfiler]
-MicrophoneVADStream -> HotwordDetector: detect_hot_keyword()
+MicrophoneVADStream -* HotwordDetector: process()
 
 MicrophoneStream --* [pyaudio.PyAudio]
 Player --* [pyaudio.PyAudio]
@@ -117,6 +116,11 @@ end note
 
 WhisperTranscriber --* [openai.OpenAI]
 
+SpeechDetector ..> AudioData
+WhisperTranscriber ..> AudioData
+LocalWhisperTranscriber ..> AudioData
+SpeechToTextTranscriber ..> AudioData
+PassThroughTextToSpeechAudioStreamer ..> AudioData
 
 ' PicoVoiceVAD --* [picovoice.pvcobra.Cobra]: process(), delete()
 

@@ -14,7 +14,8 @@ from voice_ui.speech_detection.vad_microphone import MicrophoneVADStream
 
 
 class TestSpeechDetector(unittest.TestCase):
-    def setUp(self):
+    @patch('voice_ui.speech_detection.speech_detector.SpeakerProfileManager')
+    def setUp(self, mock_profiler_init):
         self.callback = MagicMock()
         self.speaker_profiles_dir = Path("/path/to/speaker/profiles")
 
@@ -35,15 +36,14 @@ class TestSpeechDetector(unittest.TestCase):
             sample_size=2,
         )
 
+        mock_profiler_init.assert_called_once_with(self.speaker_profiles_dir)
+
     @patch('threading.Thread')
-    @patch('voice_ui.speech_detection.speech_detector.SpeakerProfileManager')
-    def test_start(self, mock_profiler_init, mock_thread):
-        with patch('os.environ', {'PORCUPINE_ACCESS_KEY': 'access_key'}):
-            self.detector.start()
+    def test_start(self, mock_thread):
+        self.detector.start()
 
         self.assertTrue(self.detector._thread.is_alive())
 
-        mock_profiler_init.assert_called_once_with(self.speaker_profiles_dir)
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
 
@@ -170,7 +170,7 @@ class TestSpeechDetector(unittest.TestCase):
     @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
     def test_handle_speech_end(self, mock_uuid4):
         self.detector.collected_chunks = [b'chunk1', b'chunk2']
-        self.detector.speaker_scores = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]  # The expected average is [3, 4, 5]
+        self.detector.speaker_scores = [[0, 1, 2, 0], [3, 0, 0, 0], [0, 4, 0, 0], [0, 0, 5, 0], [6, 7, 8, 0]]  # The expected sum is [9, 12, 15, 0]
 
         self.detector._profile_manager = MagicMock()
         self.detector._profile_manager.get_speaker_name.return_value = {'name': 'Speaker 1', 'id': 0, 'score': 1.0}
@@ -178,14 +178,14 @@ class TestSpeechDetector(unittest.TestCase):
         self.detector._handle_speech_end()
 
         mock_uuid4.assert_called_once()
-        self.detector._profile_manager.get_speaker_name.assert_called_once_with([3, 4, 5])
+        self.detector._profile_manager.get_speaker_name.assert_called_once_with([9, 12, 15, 0])
 
         self.callback.assert_called_with(
             event=SpeechEndedEvent(
                 audio_data=AudioData(
                     channels=1,
                     sample_size=2,
-                    rate=16000,
+                    rate=16_000,
                     content=b'chunk1chunk2',
                 ),
                 metadata={
@@ -207,7 +207,7 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.detector._handle_collected_chunks_overflow(50)
 
-        self.detector._profile_manager.get_speaker_name.assert_called_once_with([3, 4, 5])
+        self.detector._profile_manager.get_speaker_name.assert_called_once_with([9, 12, 15])
         self.callback.assert_called_once()
         event = self.callback.call_args[1]['event']
         self.assertIsInstance(event, PartialSpeechEndedEvent)

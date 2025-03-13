@@ -55,7 +55,9 @@ class TestSpeakerProfileManager(unittest.TestCase):
         self.manager._speaker_profiles = [{"name": "profile1", "profile_data": b"\x00\x01"}, {"name": "profile2", "profile_data": b"\x02\x03"}]
         self.assertEqual(self.manager.profiles, ['profile1', 'profile2'])
 
-    def test_load_profiles(self):
+    @patch('os.environ', {'PORCUPINE_ACCESS_KEY': 'test_key'})
+    @patch('pveagle.create_recognizer')
+    def test_load_profiles(self, mock_eagle_recognizer):
         profile_data = b'test_data'
         mock_files = [Path('/fake/dir/profile1.bin'), Path('/fake/dir/profile2.bin')]
 
@@ -63,12 +65,13 @@ class TestSpeakerProfileManager(unittest.TestCase):
         with patch('builtins.open', m_open):
             with patch('pathlib.Path.glob', return_value=mock_files):
                 with patch('pveagle.EagleProfile.from_bytes') as mock_from_bytes:
-                    profiles = self.manager._load_profiles()
+                    self.manager.load_profiles()
 
-            self.assertEqual(len(profiles), 2)
-            self.assertEqual(profiles[0]['name'], 'profile1')
-            self.assertEqual(profiles[1]['name'], 'profile2')
-            mock_from_bytes.assert_called_with(profile_data)
+        self.assertEqual(len(self.manager._speaker_profiles), 2)
+        self.assertEqual(self.manager._speaker_profiles[0]['name'], 'profile1')
+        self.assertEqual(self.manager._speaker_profiles[1]['name'], 'profile2')
+        mock_from_bytes.assert_called_with(profile_data)
+        mock_eagle_recognizer.assert_called_once()
 
 
 class TestSpeakerProfileSpeakerIdentification(unittest.TestCase):

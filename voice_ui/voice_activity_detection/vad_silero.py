@@ -32,8 +32,16 @@ class SileroVAD(IVoiceActivityDetector):
         else:
             raise ValueError(f'Invalid data type: {type(data)}')
 
+        if cache is None:
+            raise ValueError('Cache is required for streaming VAD')
+
         if 'vad_iterator' not in cache:
-            cache['vad_iterator'] = silero_vad.VADIterator(self._vad_model, min_silence_duration_ms=500, speech_pad_ms=100)
+            cache['vad_iterator'] = silero_vad.VADIterator(
+                self._vad_model,
+                threshold=kwargs.get('threshold', 0.5),
+                speech_pad_ms=kwargs.get('pre_speech_duration', 0.1) * 1000,
+                min_silence_duration_ms=kwargs.get('post_speech_duration', 0.5) * 1000,
+            )
 
         if 'speech_detected' not in cache:
             cache['speech_detected'] = False

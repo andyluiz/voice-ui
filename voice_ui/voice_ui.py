@@ -6,12 +6,14 @@ from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 
 from .speech_detection.speech_detector import (
+    HotwordDetectedEvent,
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
     SpeechEndedEvent,
     SpeechEvent,
     SpeechStartedEvent,
+    WaitingForHotwordEvent,
 )
 from .speech_recognition import (
     speech_to_text_transcriber_factory as transcriber_factory,
@@ -19,14 +21,6 @@ from .speech_recognition import (
 from .speech_recognition.speech_to_text_transcriber import SpeechToTextTranscriber
 from .speech_synthesis import text_to_speech_streamer_factory as tts_factory
 from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
-
-
-class WaitingForHotwordEvent(SpeechEvent):
-    pass
-
-
-class HotwordDetectedEvent(SpeechEvent):
-    pass
 
 
 class PartialTranscriptionEvent(SpeechEvent):
@@ -55,6 +49,7 @@ class VoiceUI:
             pre_speech_duration=self._config.get('pre_speech_duration', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
             post_speech_duration=self._config.get('post_speech_duration', 1.0),
             max_speech_duration=self._config.get('max_speech_duration', 10),
+            additional_keyword_paths=self._config.get('additional_keyword_paths', {}),
         )
         self._speech_event_handler_thread = None
 
@@ -112,32 +107,42 @@ class VoiceUI:
                     continue
 
                 hotword_inactivity_timeout = self._config.get('hotword_inactivity_timeout')
-                if hotword_inactivity_timeout and (now - self._last_speech_event_at) > timedelta(seconds=hotword_inactivity_timeout):
+                if (
+                    self._speech_detector.detection_mode != SpeechDetector.DetectionMode.HOTWORD
+                    and hotword_inactivity_timeout
+                    and (now - self._last_speech_event_at) > timedelta(seconds=hotword_inactivity_timeout)
+                ):
                     # If no speech event is received for 30 seconds
-                    self._speech_detector.stop()
+                    self._speech_detector.set_detection_mode(SpeechDetector.DetectionMode.HOTWORD)
+
                     # Call the speech callback to indicate waiting for hotword
                     safe_callback_call(event=WaitingForHotwordEvent())
                     user_input = ''
 
-                    # Detect the hotword
-                    self._speech_detector.detect_hot_keyword(
-                        additional_keyword_paths=self._config.get('additional_keyword_paths', {})
-                    )
-
-                    # Call the speech callback to indicate hotword detected
-                    safe_callback_call(event=HotwordDetectedEvent())
-                    self._speech_detector.start()
-                    self._last_speech_event_at = datetime.now()
-
                 continue
 
-            if not isinstance(event, (SpeechStartedEvent, PartialSpeechEndedEvent, SpeechEndedEvent)):
+            if not isinstance(event, (SpeechStartedEvent, PartialSpeechEndedEvent, SpeechEndedEvent, HotwordDetectedEvent, WaitingForHotwordEvent)):
                 logging.debug(f'Speech event: {event}')
                 continue
+
+            if isinstance(event, WaitingForHotwordEvent):
+                logging.info("Waiting for hotword.")
+
+                # Call the speech callback to indicate waiting for hotword
+                safe_callback_call(event=event)
+
+            if isinstance(event, HotwordDetectedEvent):
+                logging.info("Hotword detected.")
+
+                # self._speech_detector.set_detection_mode(SpeechDetector.DetectionMode.VOICE_ACTIVITY)
+
+                # Call the speech callback to indicate hotword detected
+                safe_callback_call(event=event)
 
             if isinstance(event, SpeechStartedEvent):
                 logging.info("Speech detected. Stopping TTS stream.")
                 self.stop_speaking()
+
                 safe_callback_call(event=event)
 
             if isinstance(event, (PartialSpeechEndedEvent, SpeechEndedEvent)):

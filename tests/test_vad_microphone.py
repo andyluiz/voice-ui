@@ -16,8 +16,9 @@ from voice_ui.speech_detection.vad_microphone import (
 
 class TestHotwordDetector(unittest.TestCase):
 
-    @patch('pvporcupine.create', return_value=MagicMock())
+    @patch('pvporcupine.create')
     def setUp(self, mock_create):
+        mock_create.return_value = MagicMock(frame_length=512)
         os.environ['PORCUPINE_ACCESS_KEY'] = '1234'
         self.detector = HotwordDetector()
         self.mock_create = mock_create
@@ -51,20 +52,55 @@ class TestHotwordDetector(unittest.TestCase):
         self.assertIsInstance(keywords, KeysView)
 
     def test_process_with_incorrect_audio_frame_length(self):
-        incorrect_audio_frame = [0] * (self.detector._handle.frame_length + 1)
-        with self.assertRaises(ValueError):
-            self.detector.process(incorrect_audio_frame)
+        incorrect_audio_frame = [0] * (self.detector._handle.frame_length // 2)
+
+        self.detector._handle.process.return_value = 3
+
+        result = self.detector.process(incorrect_audio_frame)
+
+        self.detector._handle.process.assert_not_called()
+        self.assertEqual(result, -1)
 
     def test_process_with_correct_audio_frame_length(self):
-        self.detector._handle.frame_length = 512
         correct_audio_frame = [0] * self.detector._handle.frame_length
 
-        self.detector._handle.process.return_value = True
+        self.detector._handle.process.return_value = 1
 
         result = self.detector.process(correct_audio_frame)
 
         self.detector._handle.process.assert_called_once()
-        self.assertTrue(result)
+        self.assertEqual(result, 1)
+
+    def test_process_with_correct_multiple_frames_no_speaker_detected(self):
+        audio_frame1 = [1] * self.detector._handle.frame_length
+        audio_frame2 = [2] * self.detector._handle.frame_length
+        audio_frame3 = [3] * self.detector._handle.frame_length
+
+        self.detector._handle.process.side_effect = [-1, -1, -1]
+
+        result = self.detector.process(audio_frame1 + audio_frame2 + audio_frame3)
+
+        self.assertEqual(result, -1)
+        self.detector._handle.process.assert_has_calls([
+            call(audio_frame1),
+            call(audio_frame2),
+            call(audio_frame3),
+        ])
+
+    def test_process_with_correct_multiple_frames_speaker_detected(self):
+        audio_frame1 = [4] * self.detector._handle.frame_length
+        audio_frame2 = [5] * self.detector._handle.frame_length
+        audio_frame3 = [6] * self.detector._handle.frame_length
+
+        self.detector._handle.process.side_effect = [-1, 2]
+
+        result = self.detector.process(audio_frame1 + audio_frame2 + audio_frame3)
+
+        self.assertEqual(result, 2)
+        self.detector._handle.process.assert_has_calls([
+            call(audio_frame1),
+            call(audio_frame2),
+        ])
 
 
 def mock_mic_stream_init(self, rate, chunk):
@@ -77,16 +113,23 @@ def mock_mic_stream_init(self, rate, chunk):
 
 class TestMicrophoneVADStream(unittest.TestCase):
 
+    @patch('voice_ui.speech_detection.vad_microphone.HotwordDetector')
     @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
-    def setUp(self, mock_vad_factory_create):
+    def setUp(self, mock_vad_factory_create, mock_hotword_detector_init):
+        self.mock_hotword_detector = MagicMock()
+        mock_hotword_detector_init.return_value = self.mock_hotword_detector
+
         self.mock_vad = MagicMock(frame_length=512)
         mock_vad_factory_create.return_value = self.mock_vad
 
         with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
             self.stream = MicrophoneVADStream()
 
+        mock_vad_factory_create.assert_called_once()
+        mock_hotword_detector_init.assert_called_once()
         self.assertEqual(self.stream._vad, self.mock_vad)
 
+    @patch('voice_ui.speech_detection.vad_microphone.HotwordDetector', MagicMock())
     @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
     def test_init_with_audio_length_out_of_limits_negative(self, mock_vad_factory_create):
         self.mock_vad = MagicMock(frame_length=512)
@@ -99,6 +142,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.assertEqual(self.stream._pre_speech_queue.maxlen, 1)
         mock_vad_factory_create.assert_called_once()
 
+    @patch('voice_ui.speech_detection.vad_microphone.HotwordDetector', MagicMock())
     @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
     def test_init_with_audio_length_out_of_limits_high(self, mock_vad_factory_create):
         self.mock_vad = MagicMock(frame_length=512)
@@ -240,47 +284,47 @@ class TestMicrophoneVADStream(unittest.TestCase):
 
         self.assertEqual(self.mock_vad.process.call_count, 1)
 
-    @patch('pvporcupine.create')
-    @patch.object(HotwordDetector, 'process', return_value=-1)
-    def test_detect_hot_keyword_no_keyword(self, mock_process, mock_porcupine_create):
-        self.stream._buff.get.side_effect = [
-            b'\x00\x00' * self.mock_vad.frame_length,
-            b'\x00\x00' * self.mock_vad.frame_length,
-            b'\x00\x00' * self.mock_vad.frame_length,
-            None
-        ]
-
-        with self.assertRaises(RuntimeError):
-            self.stream.detect_hot_keyword()
-
-        self.assertEqual(mock_process.call_count, 3)
-
-    @patch('pvporcupine.create')
-    @patch.object(HotwordDetector, 'process', return_value=1)
-    def test_detect_hot_keyword_with_keyword(self, mock_process, mock_porcupine_create):
-        self.stream._buff.get.side_effect = [
-            queue.Empty,
-            b'\x00\x00' * self.mock_vad.frame_length,
-            None
-        ]
-
-        result = self.stream.detect_hot_keyword()
-        self.assertTrue(result)
-        self.assertEqual(mock_process.call_count, 1)
-
-    @patch('pvporcupine.create')
-    def test_detect_hot_keyword_shutdown(self, mock_porcupine_create):
+    def test_detect_hot_keyword_no_keyword(self):
         def stream_side_effect(timeout=None):
-            if self.stream._buff.get.call_count >= 2:
+            if self.stream._buff.get.call_count >= 2 * 4:
                 self.stream._closed = True
-            raise queue.Empty
+
+            if self.stream._buff.get.call_count % 2 == 0:
+                raise queue.Empty
+            else:
+                return b'\x01\x01' * self.mock_vad.frame_length
 
         self.stream._buff.get.side_effect = stream_side_effect
 
-        result = self.stream.detect_hot_keyword()
-        self.assertFalse(result)
+        self.stream.convert_data = MagicMock()
+        self.mock_hotword_detector.process.return_value = -1  # No keyword detected
 
-        self.assertEqual(self.stream._buff.get.call_count, 2)
+        self.stream.set_detection_mode(self.stream.DetectionMode.HOTWORD)
+        result = list(self.stream.generator())
+
+        self.assertListEqual(result, [])
+        self.mock_vad.process.assert_not_called()
+        self.assertEqual(self.mock_hotword_detector.process.call_count, 4)
+
+    def test_detect_hot_keyword_with_keyword(self):
+        def stream_side_effect(timeout=None):
+            if self.stream._buff.get.call_count >= 4:
+                self.stream._closed = True
+
+            return bytes([self.stream._buff.get.call_count])
+
+        self.stream._buff.get.side_effect = stream_side_effect
+        self.stream.convert_data = MagicMock()
+
+        self.mock_hotword_detector.process.side_effect = [-1, -1, 1, 1]
+        self.mock_hotword_detector.available_keywords.return_value = ['Speaker 1', 'Speaker 2', 'Speaker 3', 'Speaker 4']
+
+        self.stream.set_detection_mode(self.stream.DetectionMode.HOTWORD)
+        result = list(self.stream.generator())
+
+        self.assertListEqual(result, [b"\x01\x02\x03", b"\x04"])
+        self.assertEqual(self.mock_hotword_detector.process.call_count, 3)
+        self.mock_vad.process.assert_called_once()
 
 
 if __name__ == '__main__':

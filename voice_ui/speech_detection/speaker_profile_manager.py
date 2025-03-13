@@ -17,12 +17,8 @@ class SpeakerProfileManager:
         if not self._profile_dir.exists():
             raise FileNotFoundError(f"Voice profile directory '{self._profile_dir}' does not exist")
 
-        self._speaker_profiles = self._load_profiles()
-
-        self._eagle_recognizer = pveagle.create_recognizer(
-            access_key=os.environ['PORCUPINE_ACCESS_KEY'],
-            speaker_profiles=list(map(lambda x: x["profile_data"], self._speaker_profiles))
-        )
+        # Load existing profiles
+        self.load_profiles()
 
     def __del__(self):
         if self._eagle_recognizer:
@@ -69,7 +65,7 @@ class SpeakerProfileManager:
     def profiles(self):
         return [profile["name"] for profile in self._speaker_profiles]
 
-    def _load_profiles(self) -> List[dict]:
+    def load_profiles(self):
         logging.info(f'Loading speaker profiles from {self._profile_dir}')
         profiles = []
         for file in self._profile_dir.glob("*.bin"):
@@ -82,7 +78,16 @@ class SpeakerProfileManager:
                 )
 
         logging.info(f'Loaded {len(profiles)} speaker profiles')
-        return profiles
+        self._speaker_profiles = profiles
+
+        if self._eagle_recognizer:
+            self._eagle_recognizer.delete()
+            self._eagle_recognizer = None
+
+        self._eagle_recognizer = pveagle.create_recognizer(
+            access_key=os.environ['PORCUPINE_ACCESS_KEY'],
+            speaker_profiles=list(map(lambda x: x["profile_data"], self._speaker_profiles))
+        )
 
     def detect_speaker(self, audio_frames: List[float]) -> Optional[List[float]]:
         if self._eagle_recognizer is None:
@@ -114,7 +119,7 @@ class SpeakerProfileManager:
         if not scores:
             return None
 
-        # Find the speaker by returning the index of the with the highest score
+        # Find the speaker by returning the index of the one with the highest score
         speaker_id, score = max(enumerate(scores), key=lambda x: x[1])
         if score < 0.2:
             return None

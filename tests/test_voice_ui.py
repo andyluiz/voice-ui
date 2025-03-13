@@ -5,7 +5,6 @@ from threading import Thread
 from unittest.mock import MagicMock, call, patch
 
 from voice_ui import (
-    HotwordDetectedEvent,
     PartialTranscriptionEvent,
     TranscriptionEvent,
     VoiceUI,
@@ -18,7 +17,6 @@ from voice_ui.speech_detection.speech_detector import (
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
-from voice_ui.speech_recognition.openai_whisper import WhisperTranscriber
 
 
 # Mock imports from the module where VoiceUI is defined
@@ -35,10 +33,12 @@ class TestVoiceUI(unittest.TestCase):
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),
             patch('voice_ui.speech_synthesis.text_to_speech_streamer_factory.create_tts_streamer') as mock_create_tts_streamer,
+            patch('voice_ui.speech_recognition.speech_to_text_transcriber_factory.create_transcriber') as mock_transcriber_factory,
         ):
             self.voice_ui = VoiceUI(speech_callback=self.mock_speech_callback, config=self.mock_config)
 
             mock_create_tts_streamer.assert_called_once()
+            mock_transcriber_factory.assert_called_once()
 
     def test_initialization(self):
         self.assertTrue(self.voice_ui._terminated)
@@ -70,7 +70,6 @@ class TestVoiceUI(unittest.TestCase):
 
     @patch('voice_ui.voice_ui.datetime')
     @patch.object(Thread, 'start')
-    @patch.object(WhisperTranscriber, '__init__', lambda self: None)
     @patch('voice_ui.voice_ui.logging.error')
     @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
     def test_listener_queue_empty(self, mock_uuid4, mock_logging_error, mock_thread_start, mock_datetime):
@@ -94,23 +93,16 @@ class TestVoiceUI(unittest.TestCase):
         self.voice_ui._speech_event_handler()
 
         mock_datetime.now.assert_has_calls([call(), call()])
-        self.voice_ui._speech_detector.stop.assert_called_once()
-        self.voice_ui._speech_detector.detect_hot_keyword.assert_called_once()
-        self.voice_ui._speech_detector.start.assert_called_once()
+        self.voice_ui._speech_detector.set_detection_mode.assert_called_once_with(SpeechDetector.DetectionMode.HOTWORD)
 
-        mock_uuid4.assert_has_calls([
-            call(),
-            call()
-        ])
+        mock_uuid4.assert_called_once()
 
         self.mock_speech_callback.assert_has_calls([
             call(event=WaitingForHotwordEvent()),
-            call(event=HotwordDetectedEvent()),
         ])
 
     @patch('voice_ui.voice_ui.datetime')
     @patch.object(Thread, 'start')
-    @patch.object(WhisperTranscriber, '__init__', lambda self: None)
     @patch('voice_ui.voice_ui.logging.error')
     @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
     def test_listener(self, mock_uuid4, mock_logging_error, mock_thread_start, mock_datetime):
@@ -137,18 +129,19 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._speech_events.get = MagicMock(side_effect=speech_input_get_side_effect)
 
-        with patch('voice_ui.speech_recognition.openai_whisper.WhisperTranscriber.transcribe') as mock_transcribe:
-            mock_transcribe.side_effect = [
+        self.voice_ui._audio_transcriber.transcribe = MagicMock(
+            side_effect=[
                 'transcribed partial text',
                 'transcribed final text',
             ]
+        )
 
-            self.voice_ui._speech_event_handler()
+        self.voice_ui._speech_event_handler()
 
-            mock_transcribe.assert_has_calls([
-                call(audio_data='audio data 2', prompt=''),
-                call(audio_data='audio data 3', prompt='transcribed partial text'),
-            ])
+        self.voice_ui._audio_transcriber.transcribe.assert_has_calls([
+            call(audio_data='audio data 2', prompt=''),
+            call(audio_data='audio data 3', prompt='transcribed partial text'),
+        ])
 
         self.voice_ui._speech_events.get.assert_has_calls([
             call(timeout=1),

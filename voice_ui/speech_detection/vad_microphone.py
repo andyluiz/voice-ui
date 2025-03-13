@@ -5,7 +5,8 @@ import queue
 import struct
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Dict
+from enum import Enum, auto, unique
+from typing import Dict, List, Optional
 
 import pvporcupine
 
@@ -14,7 +15,7 @@ from ..voice_activity_detection.vad_factory import VADFactory
 from ..voice_activity_detection.vad_i import IVoiceActivityDetector
 
 
-class HotwordDetector():
+class HotwordDetector:
     def __init__(
         self,
         keywords=None,
@@ -29,7 +30,7 @@ class HotwordDetector():
         KEYWORD_PATHS = self.available_keyword_paths()
         selected_keyword_paths = [KEYWORD_PATHS[x] for x in keywords]
 
-        logging.info("Listening for one of the following hotwords: {}".format(', '.join(keywords)))
+        logging.info("Hotwords: {}".format(', '.join(keywords)))
 
         # Initialize Porcupine with the specified keyword file
         self._handle = pvporcupine.create(
@@ -58,14 +59,27 @@ class HotwordDetector():
     def available_keywords(self):
         return self.available_keyword_paths().keys()
 
-    def process(self, audio_frame):
-        if len(audio_frame) != self._handle.frame_length:
-            raise ValueError(f'Audio frame length is different than expected: {len(audio_frame)} != {self._handle.frame_length}')
+    def process(self, audio_frames):
+        # Split the audio frames into chunks of frame_length
+        for i in range(0, len(audio_frames), self._handle.frame_length):
+            audio_frame = audio_frames[i:i + self._handle.frame_length]
 
-        return self._handle.process(audio_frame)
+            if self._handle.frame_length != len(audio_frame):
+                continue
+
+            result = self._handle.process(audio_frame)
+            if result >= 0:
+                return result
+
+        return -1
 
 
 class MicrophoneVADStream(MicrophoneStream):
+    @unique
+    class DetectionMode(Enum):
+        HOTWORD = auto()
+        VOICE_ACTIVITY = auto()
+
     def __init__(
         self,
         threshold: float = 0.7,
@@ -73,6 +87,7 @@ class MicrophoneVADStream(MicrophoneStream):
         post_speech_duration: float = 0.5,  # seconds
         vad_engine: str = "SileroVAD",
         detection_timeout: float = None,  # seconds
+        additional_keyword_paths: Dict[str, str] = {},
     ):
         """Initialize the MicrophoneVADStream.
 
@@ -86,8 +101,13 @@ class MicrophoneVADStream(MicrophoneStream):
         self._pre_speech_duration = pre_speech_duration
         self._post_speech_duration = post_speech_duration
         self._detection_timeout = detection_timeout
+        self._last_hotword_detected = None
 
         self._vad: IVoiceActivityDetector = VADFactory.create(vad_engine)
+        self._hotword_detector = HotwordDetector(
+            additional_keyword_paths=additional_keyword_paths
+        )
+        self._detection_mode = self.DetectionMode.VOICE_ACTIVITY
 
         super().__init__(rate=16000, chunk=self._vad.frame_length)
 
@@ -102,6 +122,21 @@ class MicrophoneVADStream(MicrophoneStream):
         self._pre_speech_audio_chunk_count = clamp(self.convert_duration_to_chunks(self._pre_speech_duration), 1, 150)
         logging.debug(f'Pre speech audio chunk count: {self._pre_speech_audio_chunk_count}')
         self._pre_speech_queue = deque(maxlen=self._pre_speech_audio_chunk_count)
+
+    @property
+    def detection_mode(self) -> DetectionMode:
+        return self._detection_mode
+
+    def set_detection_mode(self, mode: DetectionMode):
+        self._detection_mode = mode
+
+    @property
+    def last_hotword_detected(self) -> Optional[str]:
+        return self._last_hotword_detected
+
+    @property
+    def available_keywords(self) -> List[str]:
+        return list(self._hotword_detector.available_keywords())
 
     @staticmethod
     def convert_data(byte_data):
@@ -136,37 +171,6 @@ class MicrophoneVADStream(MicrophoneStream):
     def convert_duration_to_chunks(self, duration: float) -> int:
         return int(math.ceil(duration * self._rate / self._chunk))
 
-    def detect_hot_keyword(
-        self,
-        additional_keyword_paths: Dict[str, str] = {},
-    ):
-        hotword_detector = HotwordDetector(
-            additional_keyword_paths=additional_keyword_paths
-        )
-
-        self.resume()
-        while not self._closed:
-            try:
-                # Consume one chunk from the buffer
-                chunk = self._get_chunk_from_buffer()
-                if chunk is None:
-                    raise RuntimeError('Chunk is none')
-                    break
-
-                audio_frame = self.convert_data(chunk)
-                keyword_index = hotword_detector.process(audio_frame)
-
-                if keyword_index >= 0:
-                    # Keep the stream running to collect all the next frames, and return
-                    return True
-
-            except queue.Empty:
-                # Queue is empty, this is expected, continue
-                continue
-
-        self.pause()
-        return False
-
     def generator(self):
         start_time = datetime.now()
         cache = {}
@@ -184,23 +188,39 @@ class MicrophoneVADStream(MicrophoneStream):
                     raise RuntimeError('Chunk is none')
                     break
 
-                vad_res = self._vad.process(
-                    chunk,
-                    cache=cache,
-                    threshold=self._threshold,
-                    pre_speech_duration=self._pre_speech_duration,
-                    post_speech_duration=self._post_speech_duration,
-                )
+                if self.detection_mode == self.DetectionMode.VOICE_ACTIVITY:
+                    detection_result = self._vad.process(
+                        chunk,
+                        cache=cache,
+                        threshold=self._threshold,
+                        pre_speech_duration=self._pre_speech_duration,
+                        post_speech_duration=self._post_speech_duration,
+                    )
+                elif self.detection_mode == self.DetectionMode.HOTWORD:
+                    audio_frame = self.convert_data(chunk)
+                    keyword_index = self._hotword_detector.process(audio_frame)
+
+                    detection_result = (keyword_index >= 0)
+
+                    if detection_result:
+                        self._last_hotword_detected = self.available_keywords[keyword_index]
+
+                        # Switch to voice activity detection if a keyword is detected
+                        self.set_detection_mode(self.DetectionMode.VOICE_ACTIVITY)
+                    else:
+                        self._last_hotword_detected = None
+                else:
+                    raise ValueError(f'Unknown detection mode: {self.detection_mode}')
 
                 # Check if the speech has started
-                if not speech_in_progress and vad_res:
+                if not speech_in_progress and detection_result:
                     speech_in_progress = True
 
                     chunk = b"".join(self._pre_speech_queue) + chunk
                     self._pre_speech_queue.clear()
 
                 # Check if the speech has ended
-                if speech_in_progress and not vad_res:
+                if speech_in_progress and not detection_result:
                     speech_in_progress = False
 
                     # Yield an empty byte string to signal the end of the speech

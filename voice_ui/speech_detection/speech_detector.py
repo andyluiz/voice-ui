@@ -1,6 +1,7 @@
 import logging
 import threading
 from abc import ABC
+from enum import Enum, auto, unique
 from pathlib import Path
 from typing import Callable
 from uuid import UUID, uuid4
@@ -70,15 +71,28 @@ class SpeechEndedEvent(SpeechEvent):
     pass
 
 
+class WaitingForHotwordEvent(SpeechEvent):
+    pass
+
+
+class HotwordDetectedEvent(SpeechEvent):
+    pass
+
+
 class SpeechDetector:
+    @unique
+    class DetectionMode(Enum):
+        HOTWORD = auto()
+        VOICE_ACTIVITY = auto()
+
     def __init__(
         self,
         callback: Callable[[SpeechEvent], None],
         speaker_profiles_dir: Path = None,
         threshold: float = 0.2,
-        pre_speech_duration: float = 0.1,
-        post_speech_duration: float = 1.5,
-        max_speech_duration: float = 10,
+        pre_speech_duration: float = 0.1,  # Duration in seconds before speech is considered to have started
+        post_speech_duration: float = 1.5,  # Duration in seconds after speech is considered to have ended
+        max_speech_duration: float = 10,  # Maximum duration in seconds of speech to be considered
         **kwargs,
     ):
         self._mic_stream = MicrophoneVADStream(
@@ -92,11 +106,12 @@ class SpeechDetector:
         self._max_speech_duration = max_speech_duration
 
         self._speaker_profiles_dir = speaker_profiles_dir
-        self._profile_manager = None
+        self._profile_manager = SpeakerProfileManager(self._speaker_profiles_dir) if self._speaker_profiles_dir else None
         self._thread = None
 
     def start(self):
-        self._profile_manager = SpeakerProfileManager(self._speaker_profiles_dir) if self._speaker_profiles_dir else None
+        if self._profile_manager:
+            self._profile_manager.load_profiles()
 
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -108,6 +123,21 @@ class SpeechDetector:
             self._thread.join(timeout=5)
 
         self._profile_manager = None
+
+    @property
+    def detection_mode(self):
+        mapping = {
+            MicrophoneVADStream.DetectionMode.HOTWORD: SpeechDetector.DetectionMode.HOTWORD,
+            MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY: SpeechDetector.DetectionMode.VOICE_ACTIVITY,
+        }
+        return mapping[self._mic_stream.detection_mode]
+
+    def set_detection_mode(self, mode: DetectionMode):
+        mapping = {
+            SpeechDetector.DetectionMode.HOTWORD: MicrophoneVADStream.DetectionMode.HOTWORD,
+            SpeechDetector.DetectionMode.VOICE_ACTIVITY: MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY,
+        }
+        self._mic_stream.set_detection_mode(mapping[mode])
 
     def _run(self):
         logging.debug('Speech detector thread started')
@@ -129,25 +159,37 @@ class SpeechDetector:
         # Main loop to process audio chunks
         try:
             speech_detected = False
+            waiting_for_hotword = False
 
             for chunk in self._mic_stream.generator():
                 if len(chunk) == 0:
                     speech_detected = False
                     self._handle_speech_end()
+
+                    waiting_for_hotword = (self._mic_stream.detection_mode == MicrophoneVADStream.DetectionMode.HOTWORD)
+                    if waiting_for_hotword:
+                        self._handle_hotword_waiting()
+
                     continue
 
-                # Detect start of speech
-                if not speech_detected:
-                    speech_detected = True
-                    self._handle_speech_start()
-
+                # Detect speaker
                 if self._profile_manager:
                     audio_frame = self._mic_stream.convert_data(chunk)
 
                     scores = self._profile_manager.detect_speaker(audio_frame)
                     if scores:
                         self.speaker_scores.append(scores)
-                        logging.debug(f"Speaker ID: {self._profile_manager.get_speaker_name(scores)}")
+                        logging.debug(f"Scores: {scores}, speaker ID: {self._profile_manager.get_speaker_name(scores)}")
+
+                # Check if we're waiting for a hotword
+                if waiting_for_hotword:
+                    self._handle_hotword_detection()
+                    waiting_for_hotword = False
+
+                # Detect start of speech
+                if not speech_detected:
+                    speech_detected = True
+                    self._handle_speech_start()
 
                 # Collect chunks during speech detection
                 self.collected_chunks.append(chunk)
@@ -167,6 +209,43 @@ class SpeechDetector:
 
         logging.debug('Speech detector thread finished')
 
+    def _handle_hotword_waiting(self):
+        """
+        Handle hotword waiting.
+        """
+        logging.debug("Waiting for hotword")
+
+        self._callback(
+            event=WaitingForHotwordEvent(
+                hotwords=self._mic_stream.available_keywords,
+            )
+        )
+
+    def _handle_hotword_detection(self):
+        """
+        Handle hotword detection.
+        """
+        logging.debug("Hotword detected")
+
+        # Find the speaker
+        speaker_info = None
+        if self._profile_manager:
+            # # Calculate the average scores for each speaker
+            # scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+            # Calculate the total scores for each speaker
+            scores = [sum(score) for score in zip(*self.speaker_scores)]
+
+            # Get the speaker with the highest score
+            speaker_info = self._profile_manager.get_speaker_name(scores)
+            logging.debug(f"Speaker is {speaker_info} with scores {scores}")
+
+        self._callback(
+            event=HotwordDetectedEvent(
+                hotword_detected=self._mic_stream.last_hotword_detected,
+                speaker=speaker_info,
+            )
+        )
+
     def _handle_speech_start(self):
         """
         Handle the start of speech detection.
@@ -184,11 +263,14 @@ class SpeechDetector:
         # Find the speaker
         speaker_info = None
         if self._profile_manager:
-            # Calculate the average scores for each speaker
-            scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+            # # Calculate the average scores for each speaker
+            # scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+            # Calculate the total scores for each speaker
+            scores = [sum(score) for score in zip(*self.speaker_scores)]
 
-            # Get the speaker with the highest average score
+            # Get the speaker with the highest score
             speaker_info = self._profile_manager.get_speaker_name(scores)
+            logging.debug(f"Speaker is {speaker_info} with scores {scores}")
 
         self._callback(
             event=SpeechEndedEvent(
@@ -215,11 +297,14 @@ class SpeechDetector:
             # Find the speaker
             speaker_info = None
             if self._profile_manager:
-                # Calculate the average scores for each speaker
-                scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+                # # Calculate the average scores for each speaker
+                # scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+                # Calculate the total scores for each speaker
+                scores = [sum(score) for score in zip(*self.speaker_scores)]
 
-                # Get the speaker with the highest average score
+                # Get the speaker with the highest score
                 speaker_info = self._profile_manager.get_speaker_name(scores)
+                logging.debug(f"Speaker is {speaker_info} with scores {scores}")
 
             self._callback(
                 event=PartialSpeechEndedEvent(
