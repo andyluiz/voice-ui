@@ -14,6 +14,8 @@ from ..audio_io.microphone import MicrophoneStream
 from ..voice_activity_detection.vad_factory import VADFactory
 from ..voice_activity_detection.vad_i import IVoiceActivityDetector
 
+logger = logging.getLogger(__name__)
+
 
 class HotwordDetector:
     def __init__(
@@ -30,7 +32,7 @@ class HotwordDetector:
         KEYWORD_PATHS = self.available_keyword_paths()
         selected_keyword_paths = [KEYWORD_PATHS[x] for x in keywords]
 
-        logging.info("Hotwords: {}".format(', '.join(keywords)))
+        logger.info("Hotwords: {}".format(', '.join(keywords)))
 
         # Initialize Porcupine with the specified keyword file
         self._handle = pvporcupine.create(
@@ -120,7 +122,7 @@ class MicrophoneVADStream(MicrophoneStream):
                 return value
 
         self._pre_speech_audio_chunk_count = clamp(self.convert_duration_to_chunks(self._pre_speech_duration), 1, 150)
-        logging.debug(f'Pre speech audio chunk count: {self._pre_speech_audio_chunk_count}')
+        logger.debug(f'Pre speech audio chunk count: {self._pre_speech_audio_chunk_count}')
         self._pre_speech_queue = deque(maxlen=self._pre_speech_audio_chunk_count)
 
     @property

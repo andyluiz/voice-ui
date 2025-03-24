@@ -9,6 +9,8 @@ import pvcobra
 
 from .vad_i import IVoiceActivityDetector
 
+logger = logging.getLogger(__name__)
+
 
 class PicoVoiceVAD(IVoiceActivityDetector):
     def __init__(self, library_path: Optional[str] = None):
@@ -81,13 +83,13 @@ class PicoVoiceVAD(IVoiceActivityDetector):
 
         voice_probability = self._cobra.process(audio_frame)
 
-        logging.debug(f'VAD result: {voice_probability}')
+        logger.debug(f'VAD result: {voice_probability}')
 
         cache["threshold_counter"].append(voice_probability)
         cache["processed_audio_length_ms"] += 1000 * self.frame_length / self.sample_rate
 
         acc_voice_probability = sum(cache["threshold_counter"]) / len(cache["threshold_counter"])
-        # logging.debug(
+        # logger.debug(
         #     "Voice Probability: {:.2f}%, threshold: {:.2f}%".format(acc_voice_probability, threshold)
         # )
 
@@ -95,7 +97,7 @@ class PicoVoiceVAD(IVoiceActivityDetector):
             # Increment counter for chunks above threshold
             cache["above_threshold_counter"] += 1
             cache["below_threshold_counter"] = 0
-            # logging.debug(
+            # logger.debug(
             #     "Voice Probability: {:.2f}%, above_threshold_counter: {}".format(
             #         voice_probability, cache["above_threshold_counter"]
             #     )
@@ -104,7 +106,7 @@ class PicoVoiceVAD(IVoiceActivityDetector):
             # Increment counter for chunks below threshold
             cache["below_threshold_counter"] += 1
             cache["above_threshold_counter"] = 0
-            # logging.debug(
+            # logger.debug(
             #     "Voice Probability: {:.2f}%, below_threshold_counter: {}".format(
             #         voice_probability, cache["below_threshold_counter"]
             #     )

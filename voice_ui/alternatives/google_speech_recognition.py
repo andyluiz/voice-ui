@@ -9,6 +9,8 @@ from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech
 from google.protobuf.duration_pb2 import Duration
 
+logger = logging.getLogger(__name__)
+
 
 def google_speech_v2_recognize(
     stream,
@@ -100,7 +102,7 @@ def google_speech_v2_recognize(
     transcripts = []
 
     for response in responses_iterator:
-        logging.debug(f"Speech-to-Text response: {response}")
+        logger.debug(f"Speech-to-Text response: {response}")
 
         if not response.results:
             continue
@@ -138,7 +140,7 @@ def google_speech_v2_recognize(
                 'total_billed_time': response.metadata.total_billed_duration.seconds,
             }
             transcripts.append(result)
-            logging.debug(f"Speech transcript: {result}")
+            logger.debug(f"Speech transcript: {result}")
 
             # return result
 
@@ -154,7 +156,7 @@ def google_speech_v2_recognize(
         }
         print(prefix + result['text'])
 
-    logging.debug(f"Speech transcript: {result}")
+    logger.debug(f"Speech transcript: {result}")
     return result
 
 

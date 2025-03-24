@@ -8,6 +8,8 @@ from google.cloud import texttospeech
 
 from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
+logger = logging.getLogger(__name__)
+
 
 class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
     def __init__(self):
@@ -32,17 +34,17 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
             try:
                 (text, _, _) = self._data_queue.get(timeout=self._input_timeout)  # Google streaming TTS has a 5 second timeout on its input. This timeout has to be less than that.
             except queue.Empty:
-                logging.debug('No more text to synthesize')
+                logger.debug('No more text to synthesize')
                 return
 
-            logging.debug(f'Transcribing text: "{text}"')
+            logger.debug(f'Transcribing text: "{text}"')
 
             yield texttospeech.StreamingSynthesizeRequest(
                 input=texttospeech.StreamingSynthesisInput(text=text)
             )
 
     def _speaker_thread_function(self):
-        logging.debug('Starting TTS thread')
+        logger.debug('Starting TTS thread')
         while not self._terminated:
             try:
                 (text, voice, kwargs) = self._data_queue.get(timeout=self._input_timeout)
@@ -50,7 +52,7 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
                 continue
 
             try:
-                logging.debug(f'Transcribing text: "{text}"')
+                logger.debug(f'Transcribing text: "{text}"')
 
                 self._speaking = True
 
@@ -74,7 +76,7 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
 
                 for response in streaming_responses:
                     if self.is_stopped():
-                        logging.debug('Stream is stopped. Leaving.')
+                        logger.debug('Stream is stopped. Leaving.')
                         break
 
                     self._player.play_data(response.audio_content)
@@ -82,15 +84,15 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
                 self._speaking = False
 
             except exceptions.GoogleAPIError as e:
-                logging.error(f'Google API error: {e}')
+                logger.error(f'Google API error: {e}')
 
             except Exception as e:
-                logging.error(f'Error while playing audio: {e}')
+                logger.error(f'Error while playing audio: {e}')
 
             finally:
                 self._speaking = False
 
-        logging.debug('TTS thread finished')
+        logger.debug('TTS thread finished')
 
     def speak(
         self,
@@ -102,5 +104,5 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         with self._lock:
             self._stopped = False
 
-        logging.debug(f'Speaking text: "{text}"')
+        logger.debug(f'Speaking text: "{text}"')
         self._data_queue.put((text.strip(), voice, kwargs))

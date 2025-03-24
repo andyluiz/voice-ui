@@ -8,6 +8,8 @@ import pvrecorder
 
 DEFAULT_DEVICE_INDEX = -1
 
+logger = logging.getLogger(__name__)
+
 
 class SpeakerProfileManager:
     def __init__(self, profile_dir: Path):
@@ -66,7 +68,7 @@ class SpeakerProfileManager:
         return [profile["name"] for profile in self._speaker_profiles]
 
     def load_profiles(self):
-        logging.info(f'Loading speaker profiles from {self._profile_dir}')
+        logger.info(f'Loading speaker profiles from {self._profile_dir}')
         profiles = []
         for file in self._profile_dir.glob("*.bin"):
             with open(file.absolute(), "rb") as f:
@@ -77,7 +79,7 @@ class SpeakerProfileManager:
                     }
                 )
 
-        logging.info(f'Loaded {len(profiles)} speaker profiles')
+        logger.info(f'Loaded {len(profiles)} speaker profiles')
         self._speaker_profiles = profiles
 
         if self._eagle_recognizer:
@@ -91,7 +93,7 @@ class SpeakerProfileManager:
 
     def detect_speaker(self, audio_frames: List[float]) -> Optional[List[float]]:
         if self._eagle_recognizer is None:
-            logging.error("Eagle recognizer is not initialized")
+            logger.error("Eagle recognizer is not initialized")
             return None
 
         # Split the audio frames into chunks of frame_length
@@ -110,7 +112,7 @@ class SpeakerProfileManager:
         scores = [sum(s) / len(s) for s in zip(*scores)]
 
         if not scores:
-            logging.debug("No speaker detected")
+            logger.debug("No speaker detected")
             return None
 
         return scores

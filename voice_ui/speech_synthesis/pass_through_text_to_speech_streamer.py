@@ -7,6 +7,8 @@ from ..audio_io.audio_data import AudioData
 from ..audio_io.player import Player
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
+logger = logging.getLogger(__name__)
+
 
 class ByteQueue:
     def __init__(self):
@@ -40,7 +42,8 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         self._terminated = False
         self._speaker_thread = threading.Thread(
             target=self._speaker_thread_function,
-            daemon=True
+            daemon=True,
+            name='TTSAudioStreamerThread'
         )
 
         self._data_queue = queue.Queue()
@@ -71,7 +74,7 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
                 if self.is_stopped():
                     continue
 
-                # logging.debug(f'Playing {len(audio_data)} bytes of audio data')
+                # logger.debug(f'Playing {len(audio_data)} bytes of audio data')
                 self._speaking = True
                 self._player.play_data(audio_data)
                 self._speaking = False
@@ -80,7 +83,7 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
                 continue
             except Exception as e:
                 self._speaking = False
-                logging.error(f'Error while playing audio: {e}')
+                logger.error(f'Error while playing audio: {e}')
 
     def stop(self):
         with self._lock:
@@ -113,6 +116,6 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         else:
             audio_data = text
 
-        logging.debug(f'Speaking {len(audio_data)} bytes of audio')
+        logger.debug(f'Speaking {len(audio_data)} bytes of audio')
 
         self._data_queue.put(audio_data)

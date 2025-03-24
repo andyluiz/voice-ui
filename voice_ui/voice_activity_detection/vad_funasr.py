@@ -6,6 +6,8 @@ import numpy as np
 
 from .vad_i import IVoiceActivityDetector
 
+logger = logging.getLogger(__name__)
+
 
 class FunASRVAD(IVoiceActivityDetector):
     def __init__(self, frame_length_ms: int = 200):
@@ -63,7 +65,7 @@ class FunASRVAD(IVoiceActivityDetector):
             **kwargs,
         )
 
-        logging.debug(f'VAD result: {vad_res}')
+        logger.debug(f'VAD result: {vad_res}')
 
         if not vad_res:
             return cache['speech_in_progress']

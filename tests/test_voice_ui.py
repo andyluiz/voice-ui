@@ -210,7 +210,7 @@ class TestVoiceUI(unittest.TestCase):
         self.assertFalse(mock_logging_error.called)
 
     @patch.object(Thread, 'start')
-    @patch('voice_ui.voice_ui.logging.error')
+    @patch('voice_ui.voice_ui.logger.error')
     def test_text_to_speech_error_happened(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
         self.voice_ui._config = {'voice_name': 'test_voice'}

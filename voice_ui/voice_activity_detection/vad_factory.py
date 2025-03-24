@@ -1,7 +1,10 @@
+import logging
 import threading
 from typing import Type
 
 from .vad_i import IVoiceActivityDetector
+
+logger = logging.getLogger(__name__)
 
 
 class VADFactory:
@@ -10,6 +13,7 @@ class VADFactory:
 
     @classmethod
     def create(cls, vad_type: str, **kwargs) -> IVoiceActivityDetector:
+        logger.info(f"Creating VAD of type {vad_type} with kwargs {kwargs}")
         with cls._lock:
             if vad_type in cls.vad_classes:
                 return cls.vad_classes[vad_type](**kwargs)

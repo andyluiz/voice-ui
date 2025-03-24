@@ -8,6 +8,8 @@ import requests
 
 from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
+logger = logging.getLogger(__name__)
+
 
 class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
     @unique
@@ -61,10 +63,10 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         with self._lock:
             self._stopped = False
 
-        logging.debug(f'Transcribing text: "{text}"')
+        logger.debug(f'Transcribing text: "{text}"')
 
         try:
-            logging.debug('Making the API request')
+            logger.debug('Making the API request')
 
             # Send the request to the OpenAI API
             response = requests.post(
@@ -83,23 +85,23 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
                 stream=True,
             )
 
-            logging.debug('API Response received')
+            logger.debug('API Response received')
 
             response.raise_for_status()
 
             # Stream the content
-            logging.debug('Reading chunks from API response')
+            logger.debug('Reading chunks from API response')
             num_chunks = 0
             with wave.open(response.raw, 'rb') as wf:
                 while (data := wf.readframes(4800)):
                     if self.is_stopped():
-                        logging.debug('Stream is stopped. Leaving.')
+                        logger.debug('Stream is stopped. Leaving.')
                         break
                     num_chunks += len(data)
                     self._data_queue.put(data)
-            logging.debug(f'Done reading {num_chunks} chunks from API response')
+            logger.debug(f'Done reading {num_chunks} chunks from API response')
 
         except requests.exceptions.HTTPError as e:
-            logging.error(f'Error: {e}')
-            logging.debug(f'Response headers: {response.headers}')
-            logging.debug(f'Response message: {response.json()}')
+            logger.error(f'Error: {e}')
+            logger.debug(f'Response headers: {response.headers}')
+            logger.debug(f'Response message: {response.json()}')

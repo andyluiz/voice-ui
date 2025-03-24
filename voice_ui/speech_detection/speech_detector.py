@@ -10,6 +10,8 @@ from ..audio_io.audio_data import AudioData
 from .speaker_profile_manager import SpeakerProfileManager
 from .vad_microphone import MicrophoneVADStream
 
+logger = logging.getLogger(__name__)
+
 
 class SpeechEvent(ABC):
     def __init__(self, **kwargs):
@@ -113,7 +115,7 @@ class SpeechDetector:
         if self._profile_manager:
             self._profile_manager.load_profiles()
 
-        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread = threading.Thread(target=self._run, daemon=True, name='SpeechDetectorThread')
         self._thread.start()
 
     def stop(self):
@@ -140,14 +142,14 @@ class SpeechDetector:
         self._mic_stream.set_detection_mode(mapping[mode])
 
     def _run(self):
-        logging.debug('Speech detector thread started')
+        logger.debug('Speech detector thread started')
 
         if self._callback is None:
             raise ValueError("Callback is required")
 
         # Calculate chunk durations
         max_chunks = self._mic_stream.convert_duration_to_chunks(self._max_speech_duration)
-        logging.debug(f"Max chunks: {max_chunks}")
+        logger.debug(f"Max chunks: {max_chunks}")
 
         # Initialize counters and flags
         self.collected_chunks = []
@@ -179,7 +181,7 @@ class SpeechDetector:
                     scores = self._profile_manager.detect_speaker(audio_frame)
                     if scores:
                         self.speaker_scores.append(scores)
-                        logging.debug(f"Scores: {scores}, speaker ID: {self._profile_manager.get_speaker_name(scores)}")
+                        logger.debug(f"Scores: {scores}, speaker ID: {self._profile_manager.get_speaker_name(scores)}")
 
                 # Check if we're waiting for a hotword
                 if waiting_for_hotword:
@@ -207,13 +209,13 @@ class SpeechDetector:
 
             del self.collected_chunks
 
-        logging.debug('Speech detector thread finished')
+        logger.debug('Speech detector thread finished')
 
     def _handle_hotword_waiting(self):
         """
         Handle hotword waiting.
         """
-        logging.debug("Waiting for hotword")
+        logger.debug("Waiting for hotword")
 
         self._callback(
             event=WaitingForHotwordEvent(
@@ -225,7 +227,7 @@ class SpeechDetector:
         """
         Handle hotword detection.
         """
-        logging.debug("Hotword detected")
+        logger.debug("Hotword detected")
 
         # Find the speaker
         speaker_info = None
@@ -237,7 +239,7 @@ class SpeechDetector:
 
             # Get the speaker with the highest score
             speaker_info = self._profile_manager.get_speaker_name(scores)
-            logging.debug(f"Speaker is {speaker_info} with scores {scores}")
+            logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
         self._callback(
             event=HotwordDetectedEvent(
@@ -250,7 +252,7 @@ class SpeechDetector:
         """
         Handle the start of speech detection.
         """
-        logging.debug("Speech start detected")
+        logger.debug("Speech start detected")
 
         self._callback(event=SpeechStartedEvent())
 
@@ -258,7 +260,7 @@ class SpeechDetector:
         """
         Handle the end of speech detection.
         """
-        logging.debug("Speech end detected")
+        logger.debug("Speech end detected")
 
         # Find the speaker
         speaker_info = None
@@ -270,7 +272,7 @@ class SpeechDetector:
 
             # Get the speaker with the highest score
             speaker_info = self._profile_manager.get_speaker_name(scores)
-            logging.debug(f"Speaker is {speaker_info} with scores {scores}")
+            logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
         self._callback(
             event=SpeechEndedEvent(
@@ -304,7 +306,7 @@ class SpeechDetector:
 
                 # Get the speaker with the highest score
                 speaker_info = self._profile_manager.get_speaker_name(scores)
-                logging.debug(f"Speaker is {speaker_info} with scores {scores}")
+                logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
             self._callback(
                 event=PartialSpeechEndedEvent(

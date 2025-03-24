@@ -1,4 +1,8 @@
+import logging
+
 from .speech_to_text_transcriber import SpeechToTextTranscriber
+
+logger = logging.getLogger(__name__)
 
 available_transcription_engines = []
 
@@ -28,6 +32,8 @@ except ModuleNotFoundError:
 
 
 def create_transcriber(transcription_engine_name) -> SpeechToTextTranscriber:
+    logger.info(f"Creating transcriber for '{transcription_engine_name}'")
+
     if transcription_engine_name is None:
         return None
 
