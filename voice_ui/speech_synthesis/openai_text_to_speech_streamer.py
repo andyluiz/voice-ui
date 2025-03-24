@@ -15,11 +15,16 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
     @unique
     class Voice(StrEnum):
         ALLOY = 'alloy'
+        ASH = 'ash'
+        BALLAD = 'ballad'
+        CORAL = 'coral'
         ECHO = 'echo'
         FABLE = 'fable'
         ONYX = 'onyx'
         NOVA = 'nova'
+        SAGE = 'sage'
         SHIMMER = 'shimmer'
+        VERSE = 'verse'
 
     @staticmethod
     def name():
@@ -29,7 +34,19 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         return [
             {
                 'name': self.Voice.ALLOY,
+                'gender': 'FEMALE',
+            },
+            {
+                'name': self.Voice.ASH,
+                'gender': 'MALE',
+            },
+            {
+                'name': self.Voice.BALLAD,
                 'gender': 'NEUTRAL',
+            },
+            {
+                'name': self.Voice.CORAL,
+                'gender': 'FEMALE',
             },
             {
                 'name': self.Voice.ECHO,
@@ -48,8 +65,16 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
                 'gender': 'FEMALE',
             },
             {
+                'name': self.Voice.SAGE,
+                'gender': 'FEMALE',
+            },
+            {
                 'name': self.Voice.SHIMMER,
                 'gender': 'FEMALE',
+            },
+            {
+                'name': self.Voice.VERSE,
+                'gender': 'MALE',
             },
         ]
 
@@ -76,7 +101,8 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
                     'Content-Type': 'application/json; charset=utf-8',
                 },
                 json={
-                    "model": "tts-1",
+                    # "model": "tts-1",
+                    "model": "gpt-4o-mini-tts",
                     "input": text,
                     "voice": str(voice if voice else self.Voice.SHIMMER),
                     "response_format": "wav",

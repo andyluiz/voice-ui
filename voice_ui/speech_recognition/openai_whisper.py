@@ -46,9 +46,11 @@ class WhisperTranscriber(SpeechToTextTranscriber):
             # Transcribe the audio using OpenAI
             with open(audio_file_name, "rb") as audio_file:
                 response = self._client.audio.transcriptions.create(
-                    model="whisper-1",
+                    # model="whisper-1",
+                    model="gpt-4o-mini-transcribe",
                     file=audio_file,
-                    response_format="verbose_json",
+                    # response_format="verbose_json",
+                    response_format="json",
                     prompt=prompt,
                 )
         finally:

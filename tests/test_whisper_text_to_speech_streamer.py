@@ -83,12 +83,17 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
     def test_available_voices(self):
         voices = self.streamer.available_voices()
         expected_voices = [
-            {'name': self.streamer.Voice.ALLOY, 'gender': 'NEUTRAL'},
+            {'name': self.streamer.Voice.ALLOY, 'gender': 'FEMALE'},
+            {'name': self.streamer.Voice.ASH, 'gender': 'MALE'},
+            {'name': self.streamer.Voice.BALLAD, 'gender': 'NEUTRAL'},
+            {'name': self.streamer.Voice.CORAL, 'gender': 'FEMALE'},
             {'name': self.streamer.Voice.ECHO, 'gender': 'MALE'},
             {'name': self.streamer.Voice.FABLE, 'gender': 'NEUTRAL'},
             {'name': self.streamer.Voice.ONYX, 'gender': 'MALE'},
             {'name': self.streamer.Voice.NOVA, 'gender': 'FEMALE'},
+            {'name': self.streamer.Voice.SAGE, 'gender': 'FEMALE'},
             {'name': self.streamer.Voice.SHIMMER, 'gender': 'FEMALE'},
+            {'name': self.streamer.Voice.VERSE, 'gender': 'MALE'},
         ]
         self.assertEqual(voices, expected_voices)
 
