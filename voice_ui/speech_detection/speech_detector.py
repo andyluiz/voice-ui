@@ -3,7 +3,7 @@ import threading
 from abc import ABC
 from enum import Enum, auto, unique
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 from uuid import UUID, uuid4
 
 from ..audio_io.audio_data import AudioData
@@ -90,13 +90,17 @@ class SpeechDetector:
     def __init__(
         self,
         callback: Callable[[SpeechEvent], None],
-        speaker_profiles_dir: Path = None,
-        threshold: float = 0.2,
-        pre_speech_duration: float = 0.1,  # Duration in seconds before speech is considered to have started
-        post_speech_duration: float = 1.5,  # Duration in seconds after speech is considered to have ended
-        max_speech_duration: float = 10,  # Maximum duration in seconds of speech to be considered
+        speaker_profiles_dir: Optional[Path] = None,
+        threshold: Optional[float] = None,
+        pre_speech_duration: Optional[float] = None,  # Duration in seconds before speech is considered to have started
+        post_speech_duration: Optional[float] = None,  # Duration in seconds after speech is considered to have ended
+        max_speech_duration: Optional[float] = None,  # Maximum duration in seconds of speech to be considered
         **kwargs,
     ):
+        # Set defaults
+        if max_speech_duration is None:
+            max_speech_duration = 10
+
         self._mic_stream = MicrophoneVADStream(
             threshold=threshold,
             pre_speech_duration=pre_speech_duration,

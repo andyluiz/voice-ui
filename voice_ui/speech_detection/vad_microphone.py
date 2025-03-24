@@ -84,12 +84,12 @@ class MicrophoneVADStream(MicrophoneStream):
 
     def __init__(
         self,
-        threshold: float = 0.7,
-        pre_speech_duration: float = 0.2,  # seconds
-        post_speech_duration: float = 0.5,  # seconds
-        vad_engine: str = "SileroVAD",
-        detection_timeout: float = None,  # seconds
-        additional_keyword_paths: Dict[str, str] = {},
+        threshold: Optional[float] = None,
+        pre_speech_duration: Optional[float] = None,  # seconds
+        post_speech_duration: Optional[float] = None,  # seconds
+        vad_engine: Optional[str] = None,
+        detection_timeout: Optional[float] = None,  # seconds
+        additional_keyword_paths: Optional[Dict[str, str]] = {},
     ):
         """Initialize the MicrophoneVADStream.
 
@@ -99,6 +99,16 @@ class MicrophoneVADStream(MicrophoneStream):
             vad_engine (str, optional): Voice activity detection engine to use. Possible options are 'PicoVoiceVAD',
                                         'FunASRVAD' and 'SileroVAD'. Defaults to "SileroVAD".
         """
+        # Set defaults
+        if threshold is None:
+            threshold = 0.7
+        if pre_speech_duration is None:
+            pre_speech_duration = 0.2
+        if post_speech_duration is None:
+            post_speech_duration = 0.5
+        if vad_engine is None:
+            vad_engine = "SileroVAD"
+
         self._threshold = threshold
         self._pre_speech_duration = pre_speech_duration
         self._post_speech_duration = post_speech_duration

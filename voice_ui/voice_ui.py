@@ -48,10 +48,12 @@ class VoiceUI:
         self._speech_detector = SpeechDetector(
             callback=lambda event: self._speech_events.put(event),
             speaker_profiles_dir=self._config.get('voice_profiles_dir'),
+            threshold=self._config.get('vad_threshold', 0.5),
             pre_speech_duration=self._config.get('pre_speech_duration', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
             post_speech_duration=self._config.get('post_speech_duration', 1.0),
             max_speech_duration=self._config.get('max_speech_duration', 10),
             additional_keyword_paths=self._config.get('additional_keyword_paths', {}),
+            vad_engine=self._config.get('vad_engine', 'SileroVAD'),
         )
         self._speech_event_handler_thread = None
 
@@ -109,18 +111,29 @@ class VoiceUI:
                     self._last_speech_event_at = now
                     continue
 
+                # Handle inactivity
                 hotword_inactivity_timeout = self._config.get('hotword_inactivity_timeout')
-                if (
-                    self._speech_detector.detection_mode != SpeechDetector.DetectionMode.HOTWORD
-                    and hotword_inactivity_timeout
-                    and (now - self._last_speech_event_at) > timedelta(seconds=hotword_inactivity_timeout)
-                ):
-                    # If no speech event is received for 30 seconds
-                    self._speech_detector.set_detection_mode(SpeechDetector.DetectionMode.HOTWORD)
 
-                    # Call the speech callback to indicate waiting for hotword
-                    safe_callback_call(event=WaitingForHotwordEvent())
-                    user_input = ''
+                # If the hotword inactivity timeout is not set or not a valid number, skip
+                if hotword_inactivity_timeout is None or not isinstance(hotword_inactivity_timeout, (float, int)):
+                    continue
+
+                # If already in hotword detection mode, skip
+                if self._speech_detector.detection_mode == SpeechDetector.DetectionMode.HOTWORD:
+                    continue
+
+                # If the hotword inactivity timeout has not been reached, skip
+                if (now - self._last_speech_event_at) < timedelta(seconds=hotword_inactivity_timeout):
+                    continue
+
+                logger.info("Inactivity detected. Waiting for hotword.")
+
+                # Set the detection mode to hotword
+                self._speech_detector.set_detection_mode(SpeechDetector.DetectionMode.HOTWORD)
+
+                # Call the speech callback to indicate waiting for hotword
+                safe_callback_call(event=WaitingForHotwordEvent())
+                user_input = ''
 
                 continue
 
@@ -133,6 +146,7 @@ class VoiceUI:
 
                 # Call the speech callback to indicate waiting for hotword
                 safe_callback_call(event=event)
+                user_input = ''
 
             if isinstance(event, HotwordDetectedEvent):
                 logger.info("Hotword detected.")
