@@ -32,8 +32,8 @@ class TestVoiceUI(unittest.TestCase):
 
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),
-            patch('voice_ui.speech_synthesis.text_to_speech_streamer_factory.create_tts_streamer') as mock_create_tts_streamer,
-            patch('voice_ui.speech_recognition.speech_to_text_transcriber_factory.create_transcriber') as mock_transcriber_factory,
+            patch('voice_ui.voice_ui.create_tts_streamer') as mock_create_tts_streamer,
+            patch('voice_ui.voice_ui.create_transcriber') as mock_transcriber_factory,
         ):
             self.voice_ui = VoiceUI(speech_callback=self.mock_speech_callback, config=self.mock_config)
 
