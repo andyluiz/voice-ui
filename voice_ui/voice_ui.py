@@ -32,7 +32,7 @@ class TranscriptionEvent(SpeechEvent):
 class VoiceUI:
     def __init__(
         self,
-        speech_callback: Callable[SpeechEvent, bool],
+        speech_callback: Callable[[SpeechEvent], bool],
         config: Optional[Dict] = None,
     ):
         self._config = config if config else {}
