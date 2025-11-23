@@ -15,8 +15,8 @@ from .speech_detection.speech_detector import (
     SpeechStartedEvent,
     WaitingForHotwordEvent,
 )
-from .speech_recognition import SpeechToTextTranscriber, create_transcriber
-from .speech_synthesis import TextToSpeechAudioStreamer, create_tts_streamer
+from .speech_recognition import SpeechToTextTranscriber, TranscriberFactory
+from .speech_synthesis import TextToSpeechAudioStreamer, TTSFactory
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +54,15 @@ class VoiceUI:
         self._speech_event_handler_thread = None
 
         # Voice transcriber
-        self._audio_transcriber: SpeechToTextTranscriber = create_transcriber(self._config.get('audio_transcriber', 'whisper'))
+        self._audio_transcriber: SpeechToTextTranscriber = TranscriberFactory.create(
+            self._config.get('audio_transcriber', 'whisper')
+        )
 
         # Voice output
         self._speaker_queue = queue.Queue()
-        self._tts_streamer: TextToSpeechAudioStreamer = create_tts_streamer(self._config.get('tts_engine', 'openai-tts'))
+        self._tts_streamer: TextToSpeechAudioStreamer = TTSFactory.create(
+            self._config.get('tts_engine', 'openai-tts')
+        )
 
     def _speech_event_handler(self):
         """

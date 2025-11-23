@@ -20,8 +20,6 @@
 
 ## Others
 
-- Convert factories into classes like vad_factory
-
 - Create a configuration class for VoiceUI to replace the dictionary.
   - The dictionary is too loose and don't explicitly specify the available settings and their defaults
   - Implement a read-config-from-file functionality

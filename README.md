@@ -156,6 +156,14 @@ Contributing
 
 - Open a pull request against the main branch. Include tests for behavioral changes and keep changes small and focused.
 
+- Factory classes
+
+- **TranscriberFactory**: a class-based factory for speech-to-text transcribers. It allows
+   programmatic registration and management of transcriber implementations at runtime. The
+   convenience function ``create_transcriber(name)`` remains available for backward compatibility.
+
+- **TTSFactory**: a class-based factory for text-to-speech streamers with the same goals. Use
+   ``create_tts_streamer(name)`` for the existing functional API.
 License & contact
 
 - Licensed under the MIT License (see `LICENSE`).
