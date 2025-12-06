@@ -21,7 +21,7 @@ class TestSpeechDetector(unittest.TestCase):
 
         with patch.object(MicrophoneVADStream, '__init__', return_value=None):
             self.detector = SpeechDetector(
-                callback=self.callback,
+                on_speech_event=self.callback,
                 speaker_profiles_dir=self.speaker_profiles_dir,
                 threshold=0.2,
                 pre_speech_duration=0.1,
@@ -29,7 +29,7 @@ class TestSpeechDetector(unittest.TestCase):
                 max_speech_duration=10
             )
 
-        self.detector._mic_stream = MagicMock(
+        self.detector._source_stream = MagicMock(
             rate=16000,
             chunk_size=512,
             channels=1,
@@ -56,18 +56,18 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.detector.stop()
 
-        self.detector._mic_stream.pause.assert_called_once()
+        self.detector._source_stream.pause.assert_called_once()
         mock_thread.is_alive.assert_called_once()
         mock_thread.join.assert_called_once()
         self.assertIsNone(self.detector._profile_manager)
 
     def test_run_with_no_callback(self):
-        self.detector._callback = None
+        self.detector._on_speech_event = None
         with self.assertRaises(ValueError):
             self.detector._run()
 
     def test_run(self):
-        self.detector._mic_stream.generator.return_value = iter([b'data'] * 2 + [b''] + [b'data'] * 3 + [b''])
+        self.detector._source_stream.generator.return_value = iter([b'data'] * 2 + [b''] + [b'data'] * 3 + [b''])
 
         self.detector._handle_speech_start = MagicMock()
         self.detector._handle_speech_end = MagicMock()
@@ -75,17 +75,17 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.detector._run()
 
-        self.detector._mic_stream.resume.assert_called_once()
-        self.detector._mic_stream.generator.assert_called_once()
+        self.detector._source_stream.resume.assert_called_once()
+        self.detector._source_stream.generator.assert_called_once()
 
         self.assertEqual(self.detector._handle_speech_start.call_count, 2)
         self.assertEqual(self.detector._handle_speech_end.call_count, 2)
         self.assertEqual(self.detector._handle_collected_chunks_overflow.call_count, 5)
 
-        self.detector._mic_stream.pause.assert_called_once()
+        self.detector._source_stream.pause.assert_called_once()
 
     def test_run_with_profile_manager(self):
-        self.detector._mic_stream.generator.return_value = iter([b'data1'] * 2 + [b''] + [b'data2'] * 3 + [b''])
+        self.detector._source_stream.generator.return_value = iter([b'data1'] * 2 + [b''] + [b'data2'] * 3 + [b''])
 
         self.detector._profile_manager = MagicMock()
         self.detector._profile_manager.detect_speaker.side_effect = [
@@ -103,10 +103,10 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.detector._run()
 
-        self.detector._mic_stream.resume.assert_called_once()
-        self.detector._mic_stream.generator.assert_called_once()
+        self.detector._source_stream.resume.assert_called_once()
+        self.detector._source_stream.generator.assert_called_once()
 
-        self.detector._mic_stream.convert_data.assert_has_calls([
+        self.detector._source_stream.convert_data.assert_has_calls([
             call(b'data1'),
             call(b'data1'),
             call(b'data2'),
@@ -124,10 +124,10 @@ class TestSpeechDetector(unittest.TestCase):
         self.assertEqual(self.detector._handle_speech_end.call_count, 2)
         self.assertEqual(self.detector._handle_collected_chunks_overflow.call_count, 5)
 
-        self.detector._mic_stream.pause.assert_called_once()
+        self.detector._source_stream.pause.assert_called_once()
 
     def test_run_stream_stopped_mid_speech(self):
-        self.detector._mic_stream.generator.return_value = iter([b'data'] * 5)
+        self.detector._source_stream.generator.return_value = iter([b'data'] * 5)
 
         self.detector._handle_speech_start = MagicMock()
         self.detector._handle_speech_end = MagicMock()
@@ -135,15 +135,15 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.detector._run()
 
-        self.detector._mic_stream.resume.assert_called_once()
-        self.detector._mic_stream.generator.assert_called_once()
+        self.detector._source_stream.resume.assert_called_once()
+        self.detector._source_stream.generator.assert_called_once()
         self.detector._handle_speech_start.assert_called_once()
         self.detector._handle_speech_end.assert_called_once()
         self.assertEqual(self.detector._handle_collected_chunks_overflow.call_count, 5)
-        self.detector._mic_stream.pause.assert_called_once()
+        self.detector._source_stream.pause.assert_called_once()
 
     def test_run_stream_stopped_before_speech(self):
-        self.detector._mic_stream.generator.return_value = iter([])
+        self.detector._source_stream.generator.return_value = iter([])
 
         self.detector._handle_speech_start = MagicMock()
         self.detector._handle_speech_end = MagicMock()
@@ -151,14 +151,14 @@ class TestSpeechDetector(unittest.TestCase):
 
         self.detector._run()
 
-        self.detector._mic_stream.resume.assert_called_once()
-        self.detector._mic_stream.generator.assert_called_once()
+        self.detector._source_stream.resume.assert_called_once()
+        self.detector._source_stream.generator.assert_called_once()
 
         self.detector._handle_speech_start.assert_not_called()
         self.detector._handle_speech_end.assert_not_called()
         self.detector._handle_collected_chunks_overflow.assert_not_called()
 
-        self.detector._mic_stream.pause.assert_called_once()
+        self.detector._source_stream.pause.assert_called_once()
 
     @patch('voice_ui.speech_detection.speech_detector.uuid4', return_value='0')
     def test_handle_speech_start(self, mock_uuid4):

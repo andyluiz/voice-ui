@@ -89,7 +89,7 @@ class SpeechDetector:
 
     def __init__(
         self,
-        callback: Callable[[SpeechEvent], None],
+        on_speech_event: Callable[[SpeechEvent], None],
         speaker_profiles_dir: Optional[Path] = None,
         threshold: Optional[float] = None,
         pre_speech_duration: Optional[float] = None,  # Duration in seconds before speech is considered to have started
@@ -97,18 +97,45 @@ class SpeechDetector:
         max_speech_duration: Optional[float] = None,  # Maximum duration in seconds of speech to be considered
         **kwargs,
     ):
+        """
+        Initialize a SpeechDetector instance.
+
+        The SpeechDetector coordinates voice activity detection (VAD) with optional hotword detection
+        and speaker profiling to identify speech events in audio streams.
+
+        Args:
+            on_speech_event: Callback function invoked when speech events occur. Receives a SpeechEvent
+                instance (e.g., SpeechStartedEvent, SpeechEndedEvent, HotwordDetectedEvent).
+                **Important**: This callback is invoked by the internal speech processing thread and must
+                not block for extended periods, as doing so may cause event delays or missed detections.
+            speaker_profiles_dir: Optional path to a directory containing speaker profile files for
+                speaker identification. If provided, speaker detection will be enabled during speech.
+                Defaults to None (speaker detection disabled).
+            threshold: Optional VAD sensitivity threshold. Passed to MicrophoneVADStream.
+                Defaults to None (uses VAD engine defaults).
+            pre_speech_duration: Optional duration in seconds of audio to prepend to detected speech.
+                Helps capture speech that begins just before VAD triggers. Defaults to None.
+            post_speech_duration: Optional duration in seconds of silence to append after detected speech.
+                Helps capture trailing speech before silence is detected. Defaults to None.
+            max_speech_duration: Maximum duration in seconds for a single continuous speech segment.
+                If exceeded, a PartialSpeechEndedEvent is emitted and collection resets. Defaults to 10 seconds.
+            **kwargs: Additional arguments passed to MicrophoneVADStream (e.g., vad_engine, hotword_engine).
+
+        Raises:
+            ValueError: Raised in _run() if on_speech_event callback is None when the detector starts.
+        """
         # Set defaults
         if max_speech_duration is None:
             max_speech_duration = 10
 
-        self._mic_stream = MicrophoneVADStream(
+        self._source_stream = MicrophoneVADStream(
             threshold=threshold,
             pre_speech_duration=pre_speech_duration,
             post_speech_duration=post_speech_duration,
             **kwargs,
         )
 
-        self._callback = callback
+        self._on_speech_event = on_speech_event
         self._max_speech_duration = max_speech_duration
 
         self._speaker_profiles_dir = speaker_profiles_dir
@@ -123,7 +150,7 @@ class SpeechDetector:
         self._thread.start()
 
     def stop(self):
-        self._mic_stream.pause()
+        self._source_stream.pause()
 
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
@@ -136,23 +163,23 @@ class SpeechDetector:
             MicrophoneVADStream.DetectionMode.HOTWORD: SpeechDetector.DetectionMode.HOTWORD,
             MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY: SpeechDetector.DetectionMode.VOICE_ACTIVITY,
         }
-        return mapping[self._mic_stream.detection_mode]
+        return mapping[self._source_stream.detection_mode]
 
     def set_detection_mode(self, mode: DetectionMode):
         mapping = {
             SpeechDetector.DetectionMode.HOTWORD: MicrophoneVADStream.DetectionMode.HOTWORD,
             SpeechDetector.DetectionMode.VOICE_ACTIVITY: MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY,
         }
-        self._mic_stream.set_detection_mode(mapping[mode])
+        self._source_stream.set_detection_mode(mapping[mode])
 
     def _run(self):
         logger.debug('Speech detector thread started')
 
-        if self._callback is None:
+        if self._on_speech_event is None:
             raise ValueError("Callback is required")
 
         # Calculate chunk durations
-        max_chunks = self._mic_stream.convert_duration_to_chunks(self._max_speech_duration)
+        max_chunks = self._source_stream.convert_duration_to_chunks(self._max_speech_duration)
         logger.debug(f"Max chunks: {max_chunks}")
 
         # Initialize counters and flags
@@ -160,19 +187,19 @@ class SpeechDetector:
         self.speaker_scores = []
 
         # Resume audio stream
-        self._mic_stream.resume()
+        self._source_stream.resume()
 
         # Main loop to process audio chunks
         try:
             speech_detected = False
             waiting_for_hotword = False
 
-            for chunk in self._mic_stream.generator():
+            for chunk in self._source_stream.generator():
                 if len(chunk) == 0:
                     speech_detected = False
                     self._handle_speech_end()
 
-                    waiting_for_hotword = (self._mic_stream.detection_mode == MicrophoneVADStream.DetectionMode.HOTWORD)
+                    waiting_for_hotword = (self._source_stream.detection_mode == MicrophoneVADStream.DetectionMode.HOTWORD)
                     if waiting_for_hotword:
                         self._handle_hotword_waiting()
 
@@ -180,7 +207,7 @@ class SpeechDetector:
 
                 # Detect speaker
                 if self._profile_manager:
-                    audio_frame = self._mic_stream.convert_data(chunk)
+                    audio_frame = self._source_stream.convert_data(chunk)
 
                     scores = self._profile_manager.detect_speaker(audio_frame)
                     if scores:
@@ -209,7 +236,7 @@ class SpeechDetector:
 
         finally:
             # Pause audio processing when closed
-            self._mic_stream.pause()
+            self._source_stream.pause()
 
             del self.collected_chunks
 
@@ -221,9 +248,9 @@ class SpeechDetector:
         """
         logger.debug("Waiting for hotword")
 
-        self._callback(
+        self._on_speech_event(
             event=WaitingForHotwordEvent(
-                hotwords=self._mic_stream.available_keywords,
+                hotwords=self._source_stream.available_keywords,
             )
         )
 
@@ -245,9 +272,9 @@ class SpeechDetector:
             speaker_info = self._profile_manager.get_speaker_name(scores)
             logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
-        self._callback(
+        self._on_speech_event(
             event=HotwordDetectedEvent(
-                hotword_detected=self._mic_stream.last_hotword_detected,
+                hotword_detected=self._source_stream.last_hotword_detected,
                 speaker=speaker_info,
             )
         )
@@ -258,7 +285,7 @@ class SpeechDetector:
         """
         logger.debug("Speech start detected")
 
-        self._callback(event=SpeechStartedEvent())
+        self._on_speech_event(event=SpeechStartedEvent())
 
     def _handle_speech_end(self):
         """
@@ -278,12 +305,12 @@ class SpeechDetector:
             speaker_info = self._profile_manager.get_speaker_name(scores)
             logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
-        self._callback(
+        self._on_speech_event(
             event=SpeechEndedEvent(
                 audio_data=AudioData(
-                    channels=self._mic_stream.channels,
-                    sample_size=self._mic_stream.sample_size,
-                    rate=self._mic_stream.rate,
+                    channels=self._source_stream.channels,
+                    sample_size=self._source_stream.sample_size,
+                    rate=self._source_stream.rate,
                     content=b"".join(self.collected_chunks),
                 ),
                 metadata={
@@ -312,12 +339,12 @@ class SpeechDetector:
                 speaker_info = self._profile_manager.get_speaker_name(scores)
                 logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
-            self._callback(
+            self._on_speech_event(
                 event=PartialSpeechEndedEvent(
                     audio_data=AudioData(
-                        channels=self._mic_stream.channels,
-                        sample_size=self._mic_stream.sample_size,
-                        rate=self._mic_stream.rate,
+                        channels=self._source_stream.channels,
+                        sample_size=self._source_stream.sample_size,
+                        rate=self._source_stream.rate,
                         content=b"".join(self.collected_chunks),
                     ),
                     metadata={

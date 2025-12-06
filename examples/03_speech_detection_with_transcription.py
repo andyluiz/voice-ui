@@ -67,7 +67,7 @@ def process_event():
 def main():
     print('Creating speech detector...')
     speech_detector = SpeechDetector(
-        callback=lambda event: events.put(event),
+        on_speech_event=lambda event: events.put(event),
     )
 
     # Detect speech

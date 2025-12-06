@@ -29,6 +29,9 @@ class DummyTTS(TextToSpeechAudioStreamer):
     def terminate(self):
         pass
 
+    def speech_queue_size(self) -> int:
+        return 0
+
     def is_speaking(self):
         return False
 

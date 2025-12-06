@@ -85,6 +85,9 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
                 self._speaking = False
                 logger.error(f'Error while playing audio: {e}')
 
+    def speech_queue_size(self) -> int:
+        return self._data_queue.qsize()
+
     def stop(self):
         with self._lock:
             self._stopped = True

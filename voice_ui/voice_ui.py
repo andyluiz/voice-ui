@@ -42,7 +42,7 @@ class VoiceUI:
         # Voice input
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
-            callback=lambda event: self._speech_events.put(event),
+            on_speech_event=lambda event: self._speech_events.put(event),
             speaker_profiles_dir=self._config.get('voice_profiles_dir'),
             threshold=self._config.get('vad_threshold', 0.5),
             pre_speech_duration=self._config.get('pre_speech_duration', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
