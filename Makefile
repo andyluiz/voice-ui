@@ -39,13 +39,6 @@ online_tests:
 	$(COVERAGE) run --omit='tests/*.py' -m unittest discover -p 'integrated_test_*.py' -v
 	$(COVERAGE) report -m -i
 
-.PHONY: functional_tests
-functional_tests:
-	@echo Running functional tests
-	$(COVERAGE) erase
-	$(COVERAGE) run --omit='tests/*.py' -m unittest discover -v tests/functional
-	$(COVERAGE) report -m -i
-
 # Usage example: make test TEST_FILE=tests/utils/test_memory.py
 TEST_FILE :=
 .PHONY: test
