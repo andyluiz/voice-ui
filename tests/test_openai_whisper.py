@@ -18,8 +18,14 @@ class FakeAudioSegment:
 
     def export(self, filename, format=None):
         # create a small wav file content
-        with open(filename, 'wb') as f:
-            f.write(b'RIFF')
+        # Handle both file paths (str) and BytesIO objects
+        content = b'RIFF'
+        if isinstance(filename, (str, bytes)):
+            with open(filename, 'wb') as f:
+                f.write(content)
+        else:
+            # Assume it's a file-like object (BytesIO)
+            filename.write(content)
 
     def __getitem__(self, item):
         # support slicing as AudioSegment does

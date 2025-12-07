@@ -15,19 +15,6 @@ class FakePlayer:
 
 
 class TestPassThroughStreamer(unittest.TestCase):
-    def test_bytequeue_put_get_and_timeout(self):
-        bq = pts_mod.ByteQueue()
-
-        # without any put, the internal semaphore initially allows a get
-        # but no data has been added, so get should return empty bytes
-        got_empty = bq.get(timeout=0.1)
-        self.assertEqual(got_empty, b'')
-
-        # after put, get should return the data
-        bq.put(b'hello')
-        got = bq.get(timeout=0.5)
-        self.assertEqual(got, b'hello')
-
     def test_speak_and_terminate_uses_player(self):
         # Patch Player to avoid pyaudio
         orig_player = pts_mod.Player

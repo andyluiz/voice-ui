@@ -6,6 +6,8 @@ from typing import Dict, List, Optional
 
 import requests
 
+from ..audio_io.player import Player
+from ..audio_io.queued_player import QueuedAudioPlayer
 from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,15 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         SAGE = 'sage'
         SHIMMER = 'shimmer'
         VERSE = 'verse'
+
+    def __init__(self, player: Optional[Player] = None, queued_player: Optional[QueuedAudioPlayer] = None):
+        """Initialize the OpenAI TTS streamer.
+
+        Args:
+            player: Optional custom Player instance. Used if queued_player is not provided.
+            queued_player: Optional custom QueuedAudioPlayer instance. If None, one will be created.
+        """
+        super().__init__(player=player, queued_player=queued_player)
 
     @staticmethod
     def name():
@@ -84,9 +95,8 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         voice: Optional[Voice] = None,
         **kwargs,
     ):
-        # Reset the stopped flag
-        with self._lock:
-            self._stopped = False
+        # Resume playback (replaces the old "reset the stopped flag" logic)
+        self.resume()
 
         logger.debug(f'Transcribing text: "{text}"')
 
@@ -124,7 +134,7 @@ class OpenAITextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
                         logger.debug('Stream is stopped. Leaving.')
                         break
                     num_chunks += len(data)
-                    self._data_queue.put(data)
+                    self._queued_player.queue_audio(data)
             logger.debug(f'Done reading {num_chunks} chunks from API response')
 
         except requests.exceptions.HTTPError as e:

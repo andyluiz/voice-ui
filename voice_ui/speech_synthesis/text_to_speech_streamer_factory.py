@@ -13,12 +13,12 @@ class TTSFactory:
     _lock = threading.Lock()
 
     @classmethod
-    def create(cls, tts_engine_name) -> TextToSpeechAudioStreamer:
+    def create(cls, tts_engine_name, **kwargs) -> TextToSpeechAudioStreamer:
         logger.info(f"Creating TTS streamer for '{tts_engine_name}'")
 
         with cls._lock:
             if tts_engine_name in cls._tts_engines:
-                return cls._tts_engines[tts_engine_name]()
+                return cls._tts_engines[tts_engine_name](**kwargs)
 
         raise RuntimeError(f"Engine '{tts_engine_name}' is not available")
 
