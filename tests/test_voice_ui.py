@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime
+from pathlib import Path
 from queue import Empty
 from threading import Thread
 from unittest.mock import MagicMock, call, patch
@@ -8,6 +9,7 @@ from voice_ui import (
     PartialTranscriptionEvent,
     TranscriptionEvent,
     VoiceUI,
+    VoiceUIConfig,
     WaitingForHotwordEvent,
 )
 from voice_ui.speech_detection.speech_detector import (
@@ -25,10 +27,10 @@ class TestVoiceUI(unittest.TestCase):
     @patch('os.environ', {'PORCUPINE_ACCESS_KEY': '1234', 'OPENAI_API_KEY': '1234'})
     def setUp(self):
         self.mock_speech_callback = MagicMock()
-        self.mock_config = {
-            'voice_name': 'test_voice',
-            'voice_profiles_dir': '/tmp/voice_profiles',
-        }
+        self.mock_config = VoiceUIConfig(
+            voice_name='test_voice',
+            voice_profiles_dir=Path('/tmp/voice_profiles'),
+        )
 
         with (
             patch.object(SpeechDetector, '__new__', spec=SpeechDetector),
@@ -82,7 +84,11 @@ class TestVoiceUI(unittest.TestCase):
         )
         self.voice_ui._tts_streamer.is_speaking = MagicMock(return_value=False)
         self.voice_ui._terminated = False
-        self.voice_ui._config['hotword_inactivity_timeout'] = 30  # Enable inactivity timeout
+        self.voice_ui._config = VoiceUIConfig(
+            voice_name='test_voice',
+            voice_profiles_dir=Path('/tmp/voice_profiles'),
+            hotword_inactivity_timeout=30,
+        )
 
         def spech_input_get_side_effect(timeout):
             self.voice_ui._terminated = True
@@ -176,7 +182,7 @@ class TestVoiceUI(unittest.TestCase):
     @patch('voice_ui.voice_ui.logging.error')
     def test_text_to_speech(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
-        self.voice_ui._config = {'voice_name': 'test_voice'}
+        self.voice_ui._config = VoiceUIConfig(voice_name='test_voice')
 
         def speaker_queue_get_side_effect(timeout):
             self.voice_ui._terminated = True
@@ -213,7 +219,7 @@ class TestVoiceUI(unittest.TestCase):
     @patch('voice_ui.voice_ui.logger.error')
     def test_text_to_speech_error_happened(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
-        self.voice_ui._config = {'voice_name': 'test_voice'}
+        self.voice_ui._config = VoiceUIConfig(voice_name='test_voice')
         self.voice_ui._tts_streamer.speak = MagicMock(side_effect=Exception('Test exception'))
 
         inputs = ['First pass', 'Second pass']

@@ -3,8 +3,9 @@ import queue
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
+from .config import VoiceUIConfig
 from .speech_detection.speech_detector import (
     HotwordDetectedEvent,
     MetaDataEvent,
@@ -33,9 +34,9 @@ class VoiceUI:
     def __init__(
         self,
         speech_callback: Callable[[SpeechEvent], bool],
-        config: Optional[Dict] = None,
+        config: Optional[VoiceUIConfig] = None,
     ):
-        self._config = config if config else {}
+        self._config = config if config else VoiceUIConfig()
         self._terminated = True
         self._speech_callback = speech_callback
 
@@ -43,25 +44,25 @@ class VoiceUI:
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
             on_speech_event=lambda event: self._speech_events.put(event),
-            speaker_profiles_dir=self._config.get('voice_profiles_dir'),
-            threshold=self._config.get('vad_threshold', 0.5),
-            pre_speech_duration=self._config.get('pre_speech_duration', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
-            post_speech_duration=self._config.get('post_speech_duration', 1.0),
-            max_speech_duration=self._config.get('max_speech_duration', 10),
-            additional_keyword_paths=self._config.get('additional_keyword_paths', {}),
-            vad_engine=self._config.get('vad_engine', 'SileroVAD'),
+            speaker_profiles_dir=self._config.voice_profiles_dir,
+            threshold=self._config.vad_threshold,
+            pre_speech_duration=self._config.pre_speech_duration,  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
+            post_speech_duration=self._config.post_speech_duration,
+            max_speech_duration=self._config.max_speech_duration,
+            additional_keyword_paths=self._config.additional_keyword_paths,
+            vad_engine=self._config.vad_engine,
         )
         self._speech_event_handler_thread = None
 
         # Voice transcriber
         self._audio_transcriber: SpeechToTextTranscriber = TranscriberFactory.create(
-            self._config.get('audio_transcriber', 'whisper')
+            self._config.audio_transcriber
         )
 
         # Voice output
         self._speaker_queue = queue.Queue()
         self._tts_streamer: TextToSpeechAudioStreamer = TTSFactory.create(
-            self._config.get('tts_engine', 'openai-tts')
+            self._config.tts_engine
         )
 
     def _speech_event_handler(self):
@@ -112,7 +113,7 @@ class VoiceUI:
                     continue
 
                 # Handle inactivity
-                hotword_inactivity_timeout = self._config.get('hotword_inactivity_timeout')
+                hotword_inactivity_timeout = self._config.hotword_inactivity_timeout
 
                 # If the hotword inactivity timeout is not set or not a valid number, skip
                 if hotword_inactivity_timeout is None or not isinstance(hotword_inactivity_timeout, (float, int)):
@@ -264,7 +265,7 @@ class VoiceUI:
 
                 self._tts_streamer.speak(
                     text=text,
-                    voice=self._config.get('voice_name'),
+                    voice=self._config.voice_name,
                 )
                 self._speaker_queue.task_done()
 
@@ -277,7 +278,7 @@ class VoiceUI:
         if wait:
             self._tts_streamer.speak(
                 text=text,
-                voice=self._config.get('voice_name'),
+                voice=self._config.voice_name,
             )
             while self._tts_streamer.is_speaking():
                 time.sleep(timedelta(milliseconds=10).total_seconds())

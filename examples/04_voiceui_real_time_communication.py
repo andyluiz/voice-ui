@@ -16,6 +16,7 @@ from voice_ui import (
     SpeechStartedEvent,
     TranscriptionEvent,
     VoiceUI,
+    VoiceUIConfig,
 )
 
 dotenv.load_dotenv()
@@ -32,13 +33,12 @@ def main():
     # Event queue
     events = queue.Queue()
 
-    config = {
-        # 'hotword_inactivity_timeout': 30,
-        'voice_profiles_dir': Path(os.path.join(Path(__file__).parent, "voice_profiles")),
-        'post_speech_duration': 1.0,
-        'max_speech_duration': 10,
-        'tts_engine': 'google',
-    }
+    config = VoiceUIConfig(
+        voice_profiles_dir=Path(os.path.join(Path(__file__).parent, "voice_profiles")),
+        post_speech_duration=1.0,
+        max_speech_duration=10,
+        tts_engine='google',
+    )
 
     voice_ui = VoiceUI(
         speech_callback=lambda event: events.put(event),

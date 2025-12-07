@@ -19,6 +19,7 @@ from voice_ui import (
     SpeechStartedEvent,
     TranscriptionEvent,
     VoiceUI,
+    VoiceUIConfig,
 )
 
 dotenv.load_dotenv()
@@ -180,14 +181,13 @@ def main():
         level=logging.DEBUG
     )
 
-    config = {
-        # 'hotword_inactivity_timeout': 30,
-        'voice_profiles_dir': Path(os.path.join(Path(__file__).parent, "voice_profiles")),
-        'post_speech_duration': 1.0,
-        'max_speech_duration': 10,
-        'audio_transcriber': None,
-        'tts_engine': 'passthrough',
-    }
+    config = VoiceUIConfig(
+        voice_profiles_dir=Path(os.path.join(Path(__file__).parent, "voice_profiles")),
+        post_speech_duration=1.0,
+        max_speech_duration=10,
+        audio_transcriber=None,
+        tts_engine='passthrough',
+    )
 
     url = "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview"
     headers = {

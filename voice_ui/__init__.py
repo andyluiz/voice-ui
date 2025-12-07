@@ -1,4 +1,5 @@
 from .audio_io.audio_data import AudioData
+from .config import VoiceUIConfig
 from .speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -17,6 +18,7 @@ from .voice_ui import (
 
 __all__ = [
     "VoiceUI",
+    "VoiceUIConfig",
     "SpeechDetector",
     "SpeechEvent",
     "MetaDataEvent",
