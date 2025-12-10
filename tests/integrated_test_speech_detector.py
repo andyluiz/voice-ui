@@ -35,8 +35,6 @@ class TestSpeechDetector(unittest.TestCase):
         events = queue.Queue()
 
         def process_event():
-            global current_volume
-
             # Wait for the next event
             event = events.get(timeout=1)
             audio_data = event.get('audio_data')

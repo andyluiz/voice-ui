@@ -52,15 +52,15 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
 
     def test_available_voices(self):
         expected_voices = [
-            {'name': 'ALLOY', 'gender': 'NEUTRAL'},
-            {'name': 'ECHO', 'gender': 'MALE'},
-            {'name': 'FABLE', 'gender': 'NEUTRAL'},
-            {'name': 'ONYX', 'gender': 'MALE'},
-            {'name': 'NOVA', 'gender': 'FEMALE'},
-            {'name': 'SHIMMER', 'gender': 'FEMALE'},
+            {"name": "ALLOY", "gender": "NEUTRAL"},
+            {"name": "ECHO", "gender": "MALE"},
+            {"name": "FABLE", "gender": "NEUTRAL"},
+            {"name": "ONYX", "gender": "MALE"},
+            {"name": "NOVA", "gender": "FEMALE"},
+            {"name": "SHIMMER", "gender": "FEMALE"},
         ]
 
-        self.streamer._client.list_voices.return_value = expected_voices
+        self.streamer._client.list_voices.return_value = MagicMock(voices=expected_voices)
 
         voices = self.streamer.available_voices()
 

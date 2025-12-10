@@ -40,8 +40,6 @@ def print_event(msg):
 
 # Event handler
 def process_event(event):
-    global openai_ws
-    global voice_ui
     text = event.get("text")
 
     if isinstance(event, SpeechStartedEvent):
@@ -126,8 +124,6 @@ The user prefers to communicate in Brazilian Portuguese.",
 
 
 def on_message(ws, message):
-    global voice_ui
-
     event = json.loads(message)
     logging.debug(f"Received message: {json.dumps(event, indent=2)}")
 

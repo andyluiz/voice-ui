@@ -41,7 +41,7 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         return "google"
 
     def available_voices(self, language_code: Optional[str] = None) -> List[Dict]:
-        return self._client.list_voices(language_code=language_code)
+        return self._client.list_voices(language_code=language_code).voices
 
     def speak(
         self,
