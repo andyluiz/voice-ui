@@ -37,6 +37,12 @@ class TranscriberFactory:
             else:
                 raise KeyError(f"Transcriber not found: {name}")
 
+    @classmethod
+    def list_engines(cls):
+        """Return a list of all registered transcriber engine names."""
+        with cls._lock:
+            return list(cls._transcribers.keys())
+
 
 # Register available transcribers (best-effort imports)
 try:

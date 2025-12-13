@@ -8,16 +8,22 @@ COVERAGE = $(VENV)/bin/coverage
 # A utility function similar to wildcard but that can search recursively
 rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-SRCS=$(call rwildcard,tests,*.py)
+SRCS=$(call rwildcard,voice_ui,*.py) $(call rwildcard,tools,*.py) $(call rwildcard,tests,*.py)
 
 all: checks tests
 
+# checks: black flake8
 checks: flake8
 
 venv:
 	python -m venv --upgrade $(VENV)
 	$(VENV)/bin/pip install --upgrade pip
 	$(VENV)/bin/pip install -r requirements.txt
+
+.PHONY: black
+black:
+	@echo Running black
+	$(VENV)/bin/black --check --exclude .venv .
 
 .PHONY: flake8
 flake8:
@@ -52,7 +58,7 @@ compile:
 	$(PYTHON) -m py_compile $(SRCS)
 
 clean:
-	find ./voice_ui ./examples ./tests -type d -name '__pycache__' -exec rm -rf {} \;
+	find ./voice_ui ./examples ./tests ./tools -type d -name '__pycache__' -exec rm -rf {} \;
 	rm -rf docs/doxygen
 	rm -rf htmlcov .coverage
 

@@ -33,6 +33,12 @@ class VADFactory:
             else:
                 raise KeyError(f"VAD type not found: {vad_type}")
 
+    @classmethod
+    def list_engines(cls):
+        """Return a list of all registered VAD engine names."""
+        with cls._lock:
+            return list(cls.vad_classes.keys())
+
 
 try:
     from .vad_picovoice import PicoVoiceVAD

@@ -35,6 +35,12 @@ class TTSFactory:
             else:
                 raise KeyError(f"TTS engine not found: {name}")
 
+    @classmethod
+    def list_engines(cls):
+        """Return a list of all registered TTS engine names."""
+        with cls._lock:
+            return list(cls._tts_engines.keys())
+
 
 # Register built-in engines
 TTSFactory.register_tts(PassThroughTextToSpeechAudioStreamer.name(), PassThroughTextToSpeechAudioStreamer)

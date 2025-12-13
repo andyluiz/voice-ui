@@ -18,26 +18,32 @@ class CapturingPlayer(Player):
         self.captured_audio = []
         self.audio_lock = threading.Lock()
 
-        # # Set up minimal attributes to satisfy Player.__del__
-        # self._stream = None
-        # self._audio_interface = None
-        super().__init__()
+        disable_audio_playback = True
+        if disable_audio_playback:
+            # Set up minimal attributes to satisfy Player.__del__
+            self._stream = None
+            self._audio_interface = None
+        else:
+            super().__init__()
 
     def play_data(self, audio_data):
         """Capture audio data instead of playing it."""
         with self.audio_lock:
             if audio_data:
                 self.captured_audio.append(audio_data)
-                super().play_data(audio_data)
+                if self._stream:
+                    super().play_data(audio_data)
 
-    # def terminate(self):
-    #     """No-op for mock player."""
-    #     pass
+    def terminate(self):
+        """No-op for mock player."""
+        if self._stream:
+            super().terminate()
 
-    # def __del__(self):
-    #     """Override to avoid calling stop_stream on None."""
-    #     # No cleanup needed for mock player
-    #     pass
+    def __del__(self):
+        """Override to avoid calling stop_stream on None."""
+        # No cleanup needed for mock player
+        if self._stream:
+            super().__del__()
 
 
 class TestTextToSpeechAudioStreamer(unittest.TestCase):
