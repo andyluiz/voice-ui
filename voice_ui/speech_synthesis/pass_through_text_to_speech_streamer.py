@@ -17,7 +17,11 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
     It delegates all queue and playback management to QueuedAudioPlayer.
     """
 
-    def __init__(self, player: Optional[Player] = None, queued_player: Optional[QueuedAudioPlayer] = None):
+    def __init__(
+        self,
+        player: Optional[Player] = None,
+        queued_player: Optional[QueuedAudioPlayer] = None,
+    ):
         """
         Initialize the PassThroughTextToSpeechAudioStreamer.
 

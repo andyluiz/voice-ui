@@ -19,7 +19,7 @@ from voice_ui.audio_io.pyaudio_load_message_suppressor import no_alsa_and_jack_e
 dotenv.load_dotenv()
 
 status = {
-    'in_progress': False,
+    "in_progress": False,
 }
 
 player = Player()
@@ -52,7 +52,7 @@ The user prefers to communicate in Brazilian Portuguese.",
                 "model": "whisper-1",
             },
             # "turn_detection": None,
-        }
+        },
     }
 
     ws.send(json.dumps(event))
@@ -66,12 +66,12 @@ def on_message(ws, message):
     logging.debug(f"Received message: {json.dumps(event, indent=2)}")
 
     if event.get("type") == "response.created":
-        status['in_progress'] = (event.get("status") == "in_progress")
+        status["in_progress"] = event.get("status") == "in_progress"
 
     elif event.get("type") == "response.audio.delta":
         audio_delta_base64 = event.get("delta")
 
-        audio_data = base64.b64decode(audio_delta_base64.encode('utf-8'))
+        audio_data = base64.b64decode(audio_delta_base64.encode("utf-8"))
 
         player.play_data(audio_data)
 
@@ -79,10 +79,13 @@ def on_message(ws, message):
         pass
 
     elif event.get("type") == "conversation.item.created":
-        status['playing_item_id'] = event.get("item", {}).get("id")
+        status["playing_item_id"] = event.get("item", {}).get("id")
         logging.info(f"Playing item ID: {status['playing_item_id']}")
 
-    elif event.get("type") in ["response.text.delta", "response.audio_transcript.delta"]:
+    elif event.get("type") in [
+        "response.text.delta",
+        "response.audio_transcript.delta",
+    ]:
         text = event.get("delta")
         print(text, end="", flush=True)
 
@@ -99,7 +102,7 @@ def on_message(ws, message):
         print()
 
     elif event.get("type") == "response.done":
-        status['in_progress'] = False
+        status["in_progress"] = False
 
     elif event.get("type") == "input_audio_buffer.speech_started":
         print_event(f"{Fore.RED}Speech start detected{Fore.RESET}")
@@ -112,10 +115,14 @@ def on_message(ws, message):
 
 def send_audio_data(openai_ws, in_data, frame_count, time_info, status_flags):
     """Continuously collect data from the audio stream, into the buffer."""
-    openai_ws.send(json.dumps({
-        "type": "input_audio_buffer.append",
-        "audio": base64.b64encode(in_data).decode('utf-8'),
-    }))
+    openai_ws.send(
+        json.dumps(
+            {
+                "type": "input_audio_buffer.append",
+                "audio": base64.b64encode(in_data).decode("utf-8"),
+            }
+        )
+    )
 
     logging.debug(f"Sent {len(in_data)} bytes of audio data")
     return None, pyaudio.paContinue
@@ -125,17 +132,17 @@ def send_audio_data(openai_ws, in_data, frame_count, time_info, status_flags):
 def main():
     logging.basicConfig(
         # format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        format='%(asctime)s [%(name)s, %(levelname)s, %(threadName)s, %(funcName)s] %(message)s',
+        format="%(asctime)s [%(name)s, %(levelname)s, %(threadName)s, %(funcName)s] %(message)s",
         handlers=[
             # logging.StreamHandler(sys.stdout),
             logging.FileHandler("rt_api_server_vad.log"),
         ],
-        level=logging.DEBUG
+        level=logging.DEBUG,
     )
 
     url = "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview"
     headers = {
-        "Authorization": "Bearer " + os.environ['OPENAI_API_KEY'],
+        "Authorization": "Bearer " + os.environ["OPENAI_API_KEY"],
         "OpenAI-Beta": "realtime=v1",
     }
 
@@ -160,8 +167,12 @@ def main():
         start=False,  # Do not start the stream immediately
     )
 
-    print(f"{Fore.MAGENTA}Start speaking. What you say will be repeated back to you.{Fore.RESET}")
-    print(f"{Fore.MAGENTA}You can interrupt at any moment by speaking over it.{Fore.RESET}")
+    print(
+        f"{Fore.MAGENTA}Start speaking. What you say will be repeated back to you.{Fore.RESET}"
+    )
+    print(
+        f"{Fore.MAGENTA}You can interrupt at any moment by speaking over it.{Fore.RESET}"
+    )
 
     openai_ws.run_forever()
 

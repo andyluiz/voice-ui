@@ -43,18 +43,24 @@ class TTSFactory:
 
 
 # Register built-in engines
-TTSFactory.register_tts(PassThroughTextToSpeechAudioStreamer.name(), PassThroughTextToSpeechAudioStreamer)
+TTSFactory.register_tts(
+    PassThroughTextToSpeechAudioStreamer.name(), PassThroughTextToSpeechAudioStreamer
+)
 
 try:
     from .google_text_to_speech_streamer import GoogleTextToSpeechAudioStreamer
 
-    TTSFactory.register_tts(GoogleTextToSpeechAudioStreamer.name(), GoogleTextToSpeechAudioStreamer)
+    TTSFactory.register_tts(
+        GoogleTextToSpeechAudioStreamer.name(), GoogleTextToSpeechAudioStreamer
+    )
 except ModuleNotFoundError:
     pass
 
 try:
     from .openai_text_to_speech_streamer import OpenAITextToSpeechAudioStreamer
 
-    TTSFactory.register_tts(OpenAITextToSpeechAudioStreamer.name(), OpenAITextToSpeechAudioStreamer)
+    TTSFactory.register_tts(
+        OpenAITextToSpeechAudioStreamer.name(), OpenAITextToSpeechAudioStreamer
+    )
 except ModuleNotFoundError:
     pass

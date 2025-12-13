@@ -21,8 +21,8 @@ def mock_mic_stream_init(self, rate, chunk):
 
 class TestMicrophoneVADStream(unittest.TestCase):
 
-    @patch('voice_ui.speech_detection.vad_microphone.HotwordDetector')
-    @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
+    @patch("voice_ui.speech_detection.vad_microphone.HotwordDetector")
+    @patch("voice_ui.voice_activity_detection.vad_factory.VADFactory.create")
     def setUp(self, mock_vad_factory_create, mock_hotword_detector_init):
         self.mock_hotword_detector = MagicMock()
         mock_hotword_detector_init.return_value = self.mock_hotword_detector
@@ -30,33 +30,35 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.mock_vad = MagicMock(frame_length=512)
         mock_vad_factory_create.return_value = self.mock_vad
 
-        with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
+        with patch.object(MicrophoneStream, "__init__", mock_mic_stream_init):
             self.stream = MicrophoneVADStream()
 
         mock_vad_factory_create.assert_called_once()
         mock_hotword_detector_init.assert_called_once()
         self.assertEqual(self.stream._vad, self.mock_vad)
 
-    @patch('voice_ui.speech_detection.vad_microphone.HotwordDetector', MagicMock())
-    @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
-    def test_init_with_audio_length_out_of_limits_negative(self, mock_vad_factory_create):
+    @patch("voice_ui.speech_detection.vad_microphone.HotwordDetector", MagicMock())
+    @patch("voice_ui.voice_activity_detection.vad_factory.VADFactory.create")
+    def test_init_with_audio_length_out_of_limits_negative(
+        self, mock_vad_factory_create
+    ):
         self.mock_vad = MagicMock(frame_length=512)
         mock_vad_factory_create.return_value = self.mock_vad
 
-        with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
+        with patch.object(MicrophoneStream, "__init__", mock_mic_stream_init):
             self.stream = MicrophoneVADStream(pre_speech_duration=-1)
 
         self.assertEqual(self.stream._vad, self.mock_vad)
         self.assertEqual(self.stream._pre_speech_queue.maxlen, 1)
         mock_vad_factory_create.assert_called_once()
 
-    @patch('voice_ui.speech_detection.vad_microphone.HotwordDetector', MagicMock())
-    @patch('voice_ui.voice_activity_detection.vad_factory.VADFactory.create')
+    @patch("voice_ui.speech_detection.vad_microphone.HotwordDetector", MagicMock())
+    @patch("voice_ui.voice_activity_detection.vad_factory.VADFactory.create")
     def test_init_with_audio_length_out_of_limits_high(self, mock_vad_factory_create):
         self.mock_vad = MagicMock(frame_length=512)
         mock_vad_factory_create.return_value = self.mock_vad
 
-        with patch.object(MicrophoneStream, '__init__', mock_mic_stream_init):
+        with patch.object(MicrophoneStream, "__init__", mock_mic_stream_init):
             self.stream = MicrophoneVADStream(pre_speech_duration=10)
 
         self.assertEqual(self.stream._vad, self.mock_vad)
@@ -64,7 +66,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
         mock_vad_factory_create.assert_called_once()
 
     def test_convert_data(self):
-        byte_data = b'\x01\x02\x03\x04'
+        byte_data = b"\x01\x02\x03\x04"
         result = MicrophoneVADStream.convert_data(byte_data)
         self.assertEqual(result, [513, 1027])
 
@@ -84,7 +86,9 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.assertEqual(result, False)
 
     def test_pause(self):
-        with patch('voice_ui.audio_io.microphone.MicrophoneStream.pause', return_value=None) as mock_super_pause:
+        with patch(
+            "voice_ui.audio_io.microphone.MicrophoneStream.pause", return_value=None
+        ) as mock_super_pause:
             self.stream.pause()
 
         mock_super_pause.assert_called_once()
@@ -97,12 +101,12 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.stream._buff.get.assert_called_once_with(timeout=0.05)
 
     def test_get_chunk_from_buffer_with_non_empty_queue(self):
-        self.stream._buff.get.return_value = b'\x01\x02\x03\x04'
+        self.stream._buff.get.return_value = b"\x01\x02\x03\x04"
 
         chunk = self.stream._get_chunk_from_buffer()
 
         self.assertIsNotNone(chunk)
-        self.assertEqual(chunk, b'\x01\x02\x03\x04')
+        self.assertEqual(chunk, b"\x01\x02\x03\x04")
         self.assertEqual(len(self.stream._pre_speech_queue), 1)
         self.stream._buff.get.assert_called_once_with(timeout=0.05)
 
@@ -114,7 +118,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
             if self.stream._buff.get.call_count % 2 == 0:
                 raise queue.Empty
             else:
-                return b'\x01\x01' * self.mock_vad.frame_length
+                return b"\x01\x01" * self.mock_vad.frame_length
 
         self.stream._buff.get.side_effect = stream_side_effect
 
@@ -138,18 +142,18 @@ class TestMicrophoneVADStream(unittest.TestCase):
             False,  # 1
             False,
             False,
-            True,   # Speech started here. This plus two previous frames should be returned.
-            True,   # Speech in progress. This frame should be returned.
-            True,   # Speech in progress. This frame should be returned.
+            True,  # Speech started here. This plus two previous frames should be returned.
+            True,  # Speech in progress. This frame should be returned.
+            True,  # Speech in progress. This frame should be returned.
             False,  # Speech stopped here.
             False,
             False,
             False,  # 10 (\x0a)
-            True,   # Speech started here again. This plus two previous frames should be returned.
-            True,   # Speech in progress. This frame should be returned.
-            True,   # Speech in progress. This frame should be returned.
-            True,   # Speech in progress. This frame should be returned.
-            True,   # Speech in progress. This frame should be returned.
+            True,  # Speech started here again. This plus two previous frames should be returned.
+            True,  # Speech in progress. This frame should be returned.
+            True,  # Speech in progress. This frame should be returned.
+            True,  # Speech in progress. This frame should be returned.
+            True,  # Speech in progress. This frame should be returned.
             False,  # Speech stopped here.
             False,
             False,
@@ -159,7 +163,21 @@ class TestMicrophoneVADStream(unittest.TestCase):
 
         result = list(self.stream.generator())
 
-        self.assertListEqual(result, [b"\x02\x03\x04", b"\x05", b"\x06", b"", b"\x09\x0a\x0b", b"\x0c", b"\x0d", b"\x0e", b"\x0f", b""])
+        self.assertListEqual(
+            result,
+            [
+                b"\x02\x03\x04",
+                b"\x05",
+                b"\x06",
+                b"",
+                b"\x09\x0a\x0b",
+                b"\x0c",
+                b"\x0d",
+                b"\x0e",
+                b"\x0f",
+                b"",
+            ],
+        )
         self.assertEqual(self.mock_vad.process.call_count, 20)
 
     def test_detect_speech_runtime_error(self):
@@ -180,7 +198,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
             if self.stream._buff.get.call_count % 2 == 0:
                 raise queue.Empty
             else:
-                return b'\x01\x01' * self.mock_vad.frame_length
+                return b"\x01\x01" * self.mock_vad.frame_length
 
         self.stream._buff.get.side_effect = stream_side_effect
         self.stream._detection_timeout = 0.001
@@ -200,7 +218,7 @@ class TestMicrophoneVADStream(unittest.TestCase):
             if self.stream._buff.get.call_count % 2 == 0:
                 raise queue.Empty
             else:
-                return b'\x01\x01' * self.mock_vad.frame_length
+                return b"\x01\x01" * self.mock_vad.frame_length
 
         self.stream._buff.get.side_effect = stream_side_effect
 
@@ -225,7 +243,12 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.stream.convert_data = MagicMock()
 
         self.mock_hotword_detector.process.side_effect = [-1, -1, 1, 1]
-        self.mock_hotword_detector.available_keywords.return_value = ['Speaker 1', 'Speaker 2', 'Speaker 3', 'Speaker 4']
+        self.mock_hotword_detector.available_keywords.return_value = [
+            "Speaker 1",
+            "Speaker 2",
+            "Speaker 3",
+            "Speaker 4",
+        ]
 
         self.stream.set_detection_mode(self.stream.DetectionMode.HOTWORD)
         result = list(self.stream.generator())
@@ -235,5 +258,5 @@ class TestMicrophoneVADStream(unittest.TestCase):
         self.mock_vad.process.assert_called_once()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

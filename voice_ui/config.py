@@ -1,6 +1,7 @@
 """
 Configuration classes for voice_ui components.
 """
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional
@@ -64,15 +65,15 @@ class VoiceUIConfig:
             Default: None
     """
 
-    vad_engine: str = 'SileroVAD'
+    vad_engine: str = "SileroVAD"
     vad_threshold: float = 0.5
     pre_speech_duration: float = 1.0
     post_speech_duration: float = 1.0
     max_speech_duration: int = 10
     voice_profiles_dir: Optional[Path] = None
     additional_keyword_paths: Dict[str, str] = field(default_factory=dict)
-    audio_transcriber: str = 'whisper'
-    tts_engine: str = 'openai-tts'
+    audio_transcriber: str = "whisper"
+    tts_engine: str = "openai-tts"
     voice_name: Optional[str] = None
     hotword_inactivity_timeout: Optional[float] = None
 
@@ -85,27 +86,30 @@ class VoiceUIConfig:
         # Validate threshold range
         if not 0.0 <= self.vad_threshold <= 1.0:
             raise ValueError(
-                f'vad_threshold must be between 0.0 and 1.0, got {self.vad_threshold}'
+                f"vad_threshold must be between 0.0 and 1.0, got {self.vad_threshold}"
             )
 
         # Validate durations are non-negative
         if self.pre_speech_duration < 0:
             raise ValueError(
-                f'pre_speech_duration must be non-negative, got {self.pre_speech_duration}'
+                f"pre_speech_duration must be non-negative, got {self.pre_speech_duration}"
             )
 
         if self.post_speech_duration < 0:
             raise ValueError(
-                f'post_speech_duration must be non-negative, got {self.post_speech_duration}'
+                f"post_speech_duration must be non-negative, got {self.post_speech_duration}"
             )
 
         if self.max_speech_duration <= 0:
             raise ValueError(
-                f'max_speech_duration must be positive, got {self.max_speech_duration}'
+                f"max_speech_duration must be positive, got {self.max_speech_duration}"
             )
 
         # Validate hotword inactivity timeout if specified
-        if self.hotword_inactivity_timeout is not None and self.hotword_inactivity_timeout <= 0:
+        if (
+            self.hotword_inactivity_timeout is not None
+            and self.hotword_inactivity_timeout <= 0
+        ):
             raise ValueError(
-                f'hotword_inactivity_timeout must be positive or None, got {self.hotword_inactivity_timeout}'
+                f"hotword_inactivity_timeout must be positive or None, got {self.hotword_inactivity_timeout}"
             )

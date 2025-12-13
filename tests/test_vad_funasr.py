@@ -7,7 +7,7 @@ from voice_ui.voice_activity_detection.vad_funasr import FunASRVAD
 
 
 class TestFunASRVAD(unittest.TestCase):
-    @patch('funasr.AutoModel')
+    @patch("funasr.AutoModel")
     def setUp(self, mock_funasr_automodel):
         self.mock_funasr = MagicMock()
         mock_funasr_automodel.return_value = self.mock_funasr
@@ -15,7 +15,9 @@ class TestFunASRVAD(unittest.TestCase):
         self.vad = FunASRVAD(frame_length_ms=200)
 
         self.cache = {}
-        mock_funasr_automodel.assert_called_once_with(model="fsmn-vad", disable_update=True)
+        mock_funasr_automodel.assert_called_once_with(
+            model="fsmn-vad", disable_update=True
+        )
         self.assertEqual(self.mock_funasr, self.vad._vad)
 
     def test_initialization(self):
@@ -65,40 +67,44 @@ class TestFunASRVAD(unittest.TestCase):
 
     def test_process_speech_started(self):
         test_data = np.zeros(1600, dtype=np.int16).tobytes()
-        self.mock_funasr.generate.return_value = [{'key': 'rand_value', 'value': [[1234, -1]]}]
-        self.cache['speech_in_progress'] = False
+        self.mock_funasr.generate.return_value = [
+            {"key": "rand_value", "value": [[1234, -1]]}
+        ]
+        self.cache["speech_in_progress"] = False
 
         result = self.vad.process(test_data, self.cache)
         self.assertTrue(result)
-        self.assertTrue(self.cache['speech_in_progress'])
+        self.assertTrue(self.cache["speech_in_progress"])
 
     def test_process_speech_stopped(self):
         test_data = np.zeros(1600, dtype=np.int16).tobytes()
-        self.mock_funasr.generate.return_value = [{'key': 'rand_value', 'value': [[-1, 2345]]}]
-        self.cache['speech_in_progress'] = True
+        self.mock_funasr.generate.return_value = [
+            {"key": "rand_value", "value": [[-1, 2345]]}
+        ]
+        self.cache["speech_in_progress"] = True
 
         result = self.vad.process(test_data, self.cache)
         self.assertTrue(result)
-        self.assertFalse(self.cache['speech_in_progress'])
+        self.assertFalse(self.cache["speech_in_progress"])
 
     def test_process_speech_not_in_progress_no_start(self):
         test_data = np.zeros(1600, dtype=np.int16).tobytes()
-        self.mock_funasr.generate.return_value = [{'key': 'rand_value', 'value': []}]
-        self.cache['speech_in_progress'] = False
+        self.mock_funasr.generate.return_value = [{"key": "rand_value", "value": []}]
+        self.cache["speech_in_progress"] = False
 
         result = self.vad.process(test_data, self.cache)
         self.assertFalse(result)  # The same as speech_in_progress
-        self.assertFalse(self.cache['speech_in_progress'])
+        self.assertFalse(self.cache["speech_in_progress"])
 
     def test_process_speech_in_progress_no_stop(self):
         test_data = np.zeros(1600, dtype=np.int16).tobytes()
-        self.mock_funasr.generate.return_value = [{'key': 'rand_value', 'value': []}]
-        self.cache['speech_in_progress'] = True
+        self.mock_funasr.generate.return_value = [{"key": "rand_value", "value": []}]
+        self.cache["speech_in_progress"] = True
 
         result = self.vad.process(test_data, self.cache)
         self.assertTrue(result)  # The same as speech_in_progress
-        self.assertTrue(self.cache['speech_in_progress'])
+        self.assertTrue(self.cache["speech_in_progress"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

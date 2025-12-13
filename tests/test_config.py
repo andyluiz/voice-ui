@@ -6,10 +6,10 @@ import voice_ui.config as config_mod
 class TestConfig(unittest.TestCase):
     def test_defaults_and_path_conversion(self):
         c = config_mod.VoiceUIConfig()
-        self.assertEqual(c.vad_engine, 'SileroVAD')
+        self.assertEqual(c.vad_engine, "SileroVAD")
 
-        c2 = config_mod.VoiceUIConfig(voice_profiles_dir=str('/tmp'))
-        self.assertTrue(hasattr(c2.voice_profiles_dir, 'joinpath'))
+        c2 = config_mod.VoiceUIConfig(voice_profiles_dir=str("/tmp"))
+        self.assertTrue(hasattr(c2.voice_profiles_dir, "joinpath"))
 
     def test_invalid_threshold_raises(self):
         with self.assertRaises(ValueError):

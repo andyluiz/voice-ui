@@ -49,13 +49,13 @@ def process_event():
 
 # Main function
 def main():
-    print('Creating speech detector...')
+    print("Creating speech detector...")
     speech_detector = SpeechDetector(
         on_speech_event=lambda event: events.put(event),
     )
 
     # Detect speech
-    print('Listening for speech...')
+    print("Listening for speech...")
     speech_detector.start()
 
     while True:
@@ -66,7 +66,7 @@ def main():
         except (EOFError, KeyboardInterrupt):
             break
 
-    print('Stopping...')
+    print("Stopping...")
     speech_detector.stop()
 
 

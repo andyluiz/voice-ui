@@ -8,7 +8,7 @@ from voice_ui.audio_io.player import Player
 
 class FakeStream:
     def __init__(self):
-        self.written = b''
+        self.written = b""
         self.stopped = False
         self.closed = False
 
@@ -48,10 +48,12 @@ class FakeAudioInterface:
 def make_player_with_fake():
     # Create a Player-like object without invoking actual pyaudio
     p = object.__new__(Player)
-    p._audio_interface = FakeAudioInterface(devices=[
-        {'name': 'out', 'maxOutputChannels': 1, 'maxInputChannels': 0},
-        {'name': 'in', 'maxInputChannels': 1, 'maxOutputChannels': 0},
-    ])
+    p._audio_interface = FakeAudioInterface(
+        devices=[
+            {"name": "out", "maxOutputChannels": 1, "maxInputChannels": 0},
+            {"name": "in", "maxInputChannels": 1, "maxOutputChannels": 0},
+        ]
+    )
     p._stream = FakeStream()
     return p
 
@@ -60,39 +62,39 @@ class TestPlayer(unittest.TestCase):
     def test_get_devices(self):
         p = make_player_with_fake()
         out = p.get_devices(capture_devices=False)
-        self.assertIn('out', out)
+        self.assertIn("out", out)
 
         caps = p.get_devices(capture_devices=True)
-        self.assertIn('in', caps)
+        self.assertIn("in", caps)
 
     def test_find_device_index_success_and_failure(self):
         p = make_player_with_fake()
-        idx = p.find_device_index('out')
+        idx = p.find_device_index("out")
         self.assertEqual(idx, 0)
 
         with self.assertRaises(RuntimeError):
-            p.find_device_index('non-existent')
+            p.find_device_index("non-existent")
 
     def test_play_data_empty_and_non_empty(self):
         p = make_player_with_fake()
         p._stream = FakeStream()
-        p.play_data(b'')
-        self.assertEqual(p._stream.written, b'')
+        p.play_data(b"")
+        self.assertEqual(p._stream.written, b"")
 
         p._stream = FakeStream()
-        p.play_data(b'abc')
-        self.assertEqual(p._stream.written, b'abc')
+        p.play_data(b"abc")
+        self.assertEqual(p._stream.written, b"abc")
 
     def test_play_file_reads_wav_and_writes(self):
         # create temporary wav file
-        fd, path = tempfile.mkstemp(suffix='.wav')
+        fd, path = tempfile.mkstemp(suffix=".wav")
         os.close(fd)
 
-        with wave.open(path, 'wb') as wf:
+        with wave.open(path, "wb") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
             wf.setframerate(8000)
-            wf.writeframes(b'\x00\x00' * 100)
+            wf.writeframes(b"\x00\x00" * 100)
 
         class AI(FakeAudioInterface):
             def open(self, **kwargs):
@@ -109,5 +111,5 @@ class TestPlayer(unittest.TestCase):
         os.unlink(path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -14,9 +14,9 @@ def player_init(self):
 
 
 class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
-    @patch('threading.Thread')
-    @patch.object(Player, '__init__', new=player_init)
-    @patch('google.cloud.texttospeech.TextToSpeechClient')
+    @patch("threading.Thread")
+    @patch.object(Player, "__init__", new=player_init)
+    @patch("google.cloud.texttospeech.TextToSpeechClient")
     def setUp(self, mock_google_tts, mock_thread):
         self.streamer = GoogleTextToSpeechAudioStreamer()
 
@@ -60,7 +60,9 @@ class TestGoogleTextToSpeechAudioStreamer(unittest.TestCase):
             {"name": "SHIMMER", "gender": "FEMALE"},
         ]
 
-        self.streamer._client.list_voices.return_value = MagicMock(voices=expected_voices)
+        self.streamer._client.list_voices.return_value = MagicMock(
+            voices=expected_voices
+        )
 
         voices = self.streamer.available_voices()
 
@@ -87,12 +89,16 @@ class TestGoogleTextToSpeechAudioStreamerReal(unittest.TestCase):
 
         time.sleep(6)
 
-        self.streamer.speak("Playing after stream timeout.", voice="en-GB-Journey-D", language_code="en-GB")
+        self.streamer.speak(
+            "Playing after stream timeout.",
+            voice="en-GB-Journey-D",
+            language_code="en-GB",
+        )
 
         # time.sleep(0.5)
 
         while self.streamer.is_speaking():
-            print('Waiting for stream to finish')
+            print("Waiting for stream to finish")
             time.sleep(0.5)
 
         self.assertFalse(self.streamer.is_speaking())
@@ -100,5 +106,5 @@ class TestGoogleTextToSpeechAudioStreamerReal(unittest.TestCase):
         # time.sleep(10)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

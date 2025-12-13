@@ -70,8 +70,12 @@ class MicrophoneVADStream(MicrophoneStream):
             else:
                 return value
 
-        self._pre_speech_audio_chunk_count = clamp(self.convert_duration_to_chunks(self._pre_speech_duration), 1, 150)
-        logger.debug(f'Pre speech audio chunk count: {self._pre_speech_audio_chunk_count}')
+        self._pre_speech_audio_chunk_count = clamp(
+            self.convert_duration_to_chunks(self._pre_speech_duration), 1, 150
+        )
+        logger.debug(
+            f"Pre speech audio chunk count: {self._pre_speech_audio_chunk_count}"
+        )
         self._pre_speech_queue = deque(maxlen=self._pre_speech_audio_chunk_count)
 
     @property
@@ -136,7 +140,7 @@ class MicrophoneVADStream(MicrophoneStream):
                 # Consume one chunk from the buffer
                 chunk = self._buff.get(timeout=0.1)
                 if chunk is None:
-                    raise RuntimeError('Chunk is none')
+                    raise RuntimeError("Chunk is none")
                     break
 
                 if self.detection_mode == self.DetectionMode.VOICE_ACTIVITY:
@@ -151,17 +155,19 @@ class MicrophoneVADStream(MicrophoneStream):
                     audio_frame = self.convert_data(chunk)
                     keyword_index = self._hotword_detector.process(audio_frame)
 
-                    detection_result = (keyword_index >= 0)
+                    detection_result = keyword_index >= 0
 
                     if detection_result:
-                        self._last_hotword_detected = self.available_keywords[keyword_index]
+                        self._last_hotword_detected = self.available_keywords[
+                            keyword_index
+                        ]
 
                         # Switch to voice activity detection if a keyword is detected
                         self.set_detection_mode(self.DetectionMode.VOICE_ACTIVITY)
                     else:
                         self._last_hotword_detected = None
                 else:
-                    raise ValueError(f'Unknown detection mode: {self.detection_mode}')
+                    raise ValueError(f"Unknown detection mode: {self.detection_mode}")
 
                 # Check if the speech has started
                 if not speech_in_progress and detection_result:
@@ -189,9 +195,11 @@ class MicrophoneVADStream(MicrophoneStream):
                 # Queue is empty, this is expected, continue
                 pass
 
-            if self._timer_expired(start_time=start_time, timeout=self._detection_timeout):
+            if self._timer_expired(
+                start_time=start_time, timeout=self._detection_timeout
+            ):
                 self.pause()
-                raise TimeoutError('Timeout')
+                raise TimeoutError("Timeout")
 
         # Stop the stream
         self.pause()

@@ -17,8 +17,8 @@ def player_init(self):
 
 class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
 
-    @patch('threading.Thread')
-    @patch.object(Player, '__init__', new=player_init)
+    @patch("threading.Thread")
+    @patch.object(Player, "__init__", new=player_init)
     def setUp(self, mock_thread):
         self.streamer = OpenAITextToSpeechAudioStreamer()
 
@@ -41,30 +41,33 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
     def test_available_voices(self):
         voices = self.streamer.available_voices()
         expected_voices = [
-            {'name': self.streamer.Voice.ALLOY, 'gender': 'FEMALE'},
-            {'name': self.streamer.Voice.ASH, 'gender': 'MALE'},
-            {'name': self.streamer.Voice.BALLAD, 'gender': 'NEUTRAL'},
-            {'name': self.streamer.Voice.CORAL, 'gender': 'FEMALE'},
-            {'name': self.streamer.Voice.ECHO, 'gender': 'MALE'},
-            {'name': self.streamer.Voice.FABLE, 'gender': 'NEUTRAL'},
-            {'name': self.streamer.Voice.ONYX, 'gender': 'MALE'},
-            {'name': self.streamer.Voice.NOVA, 'gender': 'FEMALE'},
-            {'name': self.streamer.Voice.SAGE, 'gender': 'FEMALE'},
-            {'name': self.streamer.Voice.SHIMMER, 'gender': 'FEMALE'},
-            {'name': self.streamer.Voice.VERSE, 'gender': 'MALE'},
+            {"name": self.streamer.Voice.ALLOY, "gender": "FEMALE"},
+            {"name": self.streamer.Voice.ASH, "gender": "MALE"},
+            {"name": self.streamer.Voice.BALLAD, "gender": "NEUTRAL"},
+            {"name": self.streamer.Voice.CORAL, "gender": "FEMALE"},
+            {"name": self.streamer.Voice.ECHO, "gender": "MALE"},
+            {"name": self.streamer.Voice.FABLE, "gender": "NEUTRAL"},
+            {"name": self.streamer.Voice.ONYX, "gender": "MALE"},
+            {"name": self.streamer.Voice.NOVA, "gender": "FEMALE"},
+            {"name": self.streamer.Voice.SAGE, "gender": "FEMALE"},
+            {"name": self.streamer.Voice.SHIMMER, "gender": "FEMALE"},
+            {"name": self.streamer.Voice.VERSE, "gender": "MALE"},
         ]
         self.assertEqual(voices, expected_voices)
 
-    @patch('os.environ', {"OPENAI_API_KEY": 'test_key'})
-    @patch('requests.post')
+    @patch("os.environ", {"OPENAI_API_KEY": "test_key"})
+    @patch("requests.post")
     def test_speak_success(self, mock_post):
         mock_response = MagicMock()
         mock_response.raw = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
-        with patch('wave.open') as mock_wave:
-            mock_wave.return_value.__enter__.return_value.readframes.side_effect = [b'test_data', b'']
+        with patch("wave.open") as mock_wave:
+            mock_wave.return_value.__enter__.return_value.readframes.side_effect = [
+                b"test_data",
+                b"",
+            ]
 
             self.streamer.speak("Hello world")
 
@@ -72,11 +75,13 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         mock_post.assert_called_once()
         mock_response.raise_for_status.assert_called_once()
 
-    @patch('os.environ', {"OPENAI_API_KEY": 'test_key'})
-    @patch('requests.post')
+    @patch("os.environ", {"OPENAI_API_KEY": "test_key"})
+    @patch("requests.post")
     def test_speak_http_error(self, mock_post):
         mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTP Error")
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "HTTP Error"
+        )
         mock_post.return_value = mock_response
 
         text_queue = queue.Queue()
@@ -87,5 +92,5 @@ class TestWhisperTextToSpeechAudioStreamer(unittest.TestCase):
         self.assertEqual(mock_response.raise_for_status.call_count, 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -25,7 +25,9 @@ class TranscriberFactory:
         raise RuntimeError(f"Engine '{transcription_engine_name}' is not available")
 
     @classmethod
-    def register_transcriber(cls, name: str, transcriber_class: Type[SpeechToTextTranscriber]):
+    def register_transcriber(
+        cls, name: str, transcriber_class: Type[SpeechToTextTranscriber]
+    ):
         with cls._lock:
             cls._transcribers[name] = transcriber_class
 
@@ -48,13 +50,17 @@ class TranscriberFactory:
 try:
     from .openai_local_whisper import LocalWhisperTranscriber
 
-    TranscriberFactory.register_transcriber(LocalWhisperTranscriber.name(), LocalWhisperTranscriber)
+    TranscriberFactory.register_transcriber(
+        LocalWhisperTranscriber.name(), LocalWhisperTranscriber
+    )
 except ModuleNotFoundError:
     pass
 
 try:
     from .openai_whisper import WhisperTranscriber
 
-    TranscriberFactory.register_transcriber(WhisperTranscriber.name(), WhisperTranscriber)
+    TranscriberFactory.register_transcriber(
+        WhisperTranscriber.name(), WhisperTranscriber
+    )
 except ModuleNotFoundError:
     pass

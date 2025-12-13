@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 class SpeechEvent(ABC):
     def __init__(self, **kwargs):
         if self.__class__ == SpeechEvent:
-            raise TypeError('SpeechEvent is an abstract class and cannot be instantiated directly')
+            raise TypeError(
+                "SpeechEvent is an abstract class and cannot be instantiated directly"
+            )
 
         self._id = uuid4()
 
@@ -24,7 +26,9 @@ class SpeechEvent(ABC):
             if not hasattr(self, k):
                 setattr(self, k, v)
             else:
-                raise AttributeError(f'{self.__class__.__name__} already has attribute {k}')
+                raise AttributeError(
+                    f"{self.__class__.__name__} already has attribute {k}"
+                )
 
     @property
     def name(self) -> str:
@@ -37,10 +41,10 @@ class SpeechEvent(ABC):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return False
-        return (self.__dict__ == other.__dict__)
+        return self.__dict__ == other.__dict__
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.__dict__})'
+        return f"{self.__class__.__name__}({self.__dict__})"
 
     def get(self, key: str, default=None):
         return self.__dict__.get(key, default)
@@ -92,9 +96,15 @@ class SpeechDetector:
         on_speech_event: Callable[[SpeechEvent], None],
         speaker_profiles_dir: Optional[Path] = None,
         threshold: Optional[float] = None,
-        pre_speech_duration: Optional[float] = None,  # Duration in seconds before speech is considered to have started
-        post_speech_duration: Optional[float] = None,  # Duration in seconds after speech is considered to have ended
-        max_speech_duration: Optional[float] = None,  # Maximum duration in seconds of speech to be considered
+        pre_speech_duration: Optional[
+            float
+        ] = None,  # Duration in seconds before speech is considered to have started
+        post_speech_duration: Optional[
+            float
+        ] = None,  # Duration in seconds after speech is considered to have ended
+        max_speech_duration: Optional[
+            float
+        ] = None,  # Maximum duration in seconds of speech to be considered
         **kwargs,
     ):
         """
@@ -139,14 +149,20 @@ class SpeechDetector:
         self._max_speech_duration = max_speech_duration
 
         self._speaker_profiles_dir = speaker_profiles_dir
-        self._profile_manager = SpeakerProfileManager(self._speaker_profiles_dir) if self._speaker_profiles_dir else None
+        self._profile_manager = (
+            SpeakerProfileManager(self._speaker_profiles_dir)
+            if self._speaker_profiles_dir
+            else None
+        )
         self._thread = None
 
     def start(self):
         if self._profile_manager:
             self._profile_manager.load_profiles()
 
-        self._thread = threading.Thread(target=self._run, daemon=True, name='SpeechDetectorThread')
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="SpeechDetectorThread"
+        )
         self._thread.start()
 
     def stop(self):
@@ -173,13 +189,15 @@ class SpeechDetector:
         self._source_stream.set_detection_mode(mapping[mode])
 
     def _run(self):
-        logger.debug('Speech detector thread started')
+        logger.debug("Speech detector thread started")
 
         if self._on_speech_event is None:
             raise ValueError("Callback is required")
 
         # Calculate chunk durations
-        max_chunks = self._source_stream.convert_duration_to_chunks(self._max_speech_duration)
+        max_chunks = self._source_stream.convert_duration_to_chunks(
+            self._max_speech_duration
+        )
         logger.debug(f"Max chunks: {max_chunks}")
 
         # Initialize counters and flags
@@ -199,7 +217,10 @@ class SpeechDetector:
                     speech_detected = False
                     self._handle_speech_end()
 
-                    waiting_for_hotword = (self._source_stream.detection_mode == MicrophoneVADStream.DetectionMode.HOTWORD)
+                    waiting_for_hotword = (
+                        self._source_stream.detection_mode
+                        == MicrophoneVADStream.DetectionMode.HOTWORD
+                    )
                     if waiting_for_hotword:
                         self._handle_hotword_waiting()
 
@@ -212,7 +233,9 @@ class SpeechDetector:
                     scores = self._profile_manager.detect_speaker(audio_frame)
                     if scores:
                         self.speaker_scores.append(scores)
-                        logger.debug(f"Scores: {scores}, speaker ID: {self._profile_manager.get_speaker_name(scores)}")
+                        logger.debug(
+                            f"Scores: {scores}, speaker ID: {self._profile_manager.get_speaker_name(scores)}"
+                        )
 
                 # Check if we're waiting for a hotword
                 if waiting_for_hotword:
@@ -240,7 +263,7 @@ class SpeechDetector:
 
             del self.collected_chunks
 
-        logger.debug('Speech detector thread finished')
+        logger.debug("Speech detector thread finished")
 
     def _handle_hotword_waiting(self):
         """
@@ -315,7 +338,7 @@ class SpeechDetector:
                 ),
                 metadata={
                     "speaker": speaker_info,
-                }
+                },
             )
         )
         self.collected_chunks.clear()
@@ -326,7 +349,9 @@ class SpeechDetector:
         Handle the case where collected chunks exceed the maximum duration.
         """
         n_collected_chunks = len(self.collected_chunks)
-        if n_collected_chunks > int(0.8 * max_chunks) or n_collected_chunks > int(1.2 * max_chunks):
+        if n_collected_chunks > int(0.8 * max_chunks) or n_collected_chunks > int(
+            1.2 * max_chunks
+        ):
             # Find the speaker
             speaker_info = None
             if self._profile_manager:
@@ -349,7 +374,7 @@ class SpeechDetector:
                     ),
                     metadata={
                         "speaker": speaker_info,
-                    }
+                    },
                 )
             )
             self.collected_chunks.clear()

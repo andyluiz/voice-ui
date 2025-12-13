@@ -12,8 +12,7 @@ SRCS=$(call rwildcard,voice_ui,*.py) $(call rwildcard,tools,*.py) $(call rwildca
 
 all: checks tests
 
-# checks: black flake8
-checks: flake8
+checks: black flake8
 
 venv:
 	python -m venv --upgrade $(VENV)

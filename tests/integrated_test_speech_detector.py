@@ -37,20 +37,28 @@ class TestSpeechDetector(unittest.TestCase):
         def process_event():
             # Wait for the next event
             event = events.get(timeout=1)
-            audio_data = event.get('audio_data')
-            metadata = event.get('metadata')
+            audio_data = event.get("audio_data")
+            metadata = event.get("metadata")
 
             if isinstance(event, SpeechStartedEvent):
-                print('\nSpeech start detected')
+                print("\nSpeech start detected")
 
             elif isinstance(event, (SpeechEndedEvent, PartialSpeechEndedEvent)):
-                print('\nSpeech {} detected'.format("end" if isinstance(event, SpeechEndedEvent) else "partial end"))
+                print(
+                    "\nSpeech {} detected".format(
+                        "end" if isinstance(event, SpeechEndedEvent) else "partial end"
+                    )
+                )
 
                 print(f"Speaker: {metadata['speaker']}")
 
                 response = self.transcriber.transcribe(
                     audio_data=audio_data,
-                    prompt=transcriptions[-1] if isinstance(event, PartialSpeechEndedEvent) and transcriptions else None,
+                    prompt=(
+                        transcriptions[-1]
+                        if isinstance(event, PartialSpeechEndedEvent) and transcriptions
+                        else None
+                    ),
                 )
 
                 # Response is already a string from the transcriber
@@ -63,15 +71,18 @@ class TestSpeechDetector(unittest.TestCase):
                 # print(response)
                 if isinstance(event, SpeechEndedEvent) or len(transcriptions) == 0:
                     transcriptions.append(transcription)
-                    print(transcription, end='\n\n')
+                    print(transcription, end="\n\n")
                 else:
-                    transcriptions[-1] += ' ' + transcription
+                    transcriptions[-1] += " " + transcription
                     print(transcription)
                 # print('\n'.join(last_transcription))
             elif isinstance(event, MetaDataEvent):
-                max_size = len('Voice Probability: {}'.format(100 * '#'))
+                max_size = len("Voice Probability: {}".format(100 * "#"))
                 print(
-                    ' ' * max_size + '\rVoice Probability: {}'.format(int(metadata['voice_probability'] * 100) * '#'),
+                    " " * max_size
+                    + "\rVoice Probability: {}".format(
+                        int(metadata["voice_probability"] * 100) * "#"
+                    ),
                     end="\r",
                     flush=True,
                 )
@@ -91,7 +102,7 @@ class TestSpeechDetector(unittest.TestCase):
         with wave.open("tests/resources/youtube_show.wav", "rb") as wf:
             int16_list = wf.readframes(wf.getnframes())
             for i in range(0, len(int16_list), 1024):
-                chunks = int16_list[i:i + 1024]
+                chunks = int16_list[i : i + 1024]
                 if len(chunks) == 1024:
                     self.speech_detector._source_stream._buff.put(chunks)
         #############################################################################
@@ -101,6 +112,7 @@ class TestSpeechDetector(unittest.TestCase):
 
         # Give the detector thread time to process all audio and events
         import time
+
         max_wait = 30  # Wait up to 30 seconds for processing
         start_time = time.time()
 
@@ -135,5 +147,5 @@ class TestSpeechDetector(unittest.TestCase):
         self.assertGreater(len(transcriptions), 0, "No transcriptions were generated")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

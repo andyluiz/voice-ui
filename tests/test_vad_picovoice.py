@@ -9,7 +9,7 @@ from voice_ui.voice_activity_detection.vad_picovoice import PicoVoiceVAD
 
 
 class TestPicoVoiceVAD(unittest.TestCase):
-    @patch('pvcobra.create')
+    @patch("pvcobra.create")
     def setUp(self, mock_create):
         # Mock the cobra object
         self.mock_cobra = MagicMock()
@@ -18,7 +18,7 @@ class TestPicoVoiceVAD(unittest.TestCase):
         mock_create.return_value = self.mock_cobra
 
         # Set environment variable for testing
-        os.environ['PORCUPINE_ACCESS_KEY'] = 'test-key'
+        os.environ["PORCUPINE_ACCESS_KEY"] = "test-key"
 
         self.vad = PicoVoiceVAD()
         self.cache = {}
@@ -62,7 +62,7 @@ class TestPicoVoiceVAD(unittest.TestCase):
             self.cache,
             threshold=0.7,
             pre_speech_duration=0.2,
-            post_speech_duration=1.0
+            post_speech_duration=1.0,
         )
         self.assertIsInstance(result, bool)
 
@@ -70,11 +70,7 @@ class TestPicoVoiceVAD(unittest.TestCase):
         test_data = [0] * 512
         self.mock_cobra.process.return_value = 0.8
 
-        result = self.vad.process(
-            test_data,
-            self.cache,
-            threshold=0.7
-        )
+        result = self.vad.process(test_data, self.cache, threshold=0.7)
         self.assertIsInstance(result, bool)
 
     def test_process_invalid_data_type(self):
@@ -93,10 +89,7 @@ class TestPicoVoiceVAD(unittest.TestCase):
         # Process multiple frames to trigger speech detection
         for _ in range(5):
             self.vad.process(
-                test_data,
-                self.cache,
-                threshold=0.7,
-                pre_speech_duration=0.1
+                test_data, self.cache, threshold=0.7, pre_speech_duration=0.1
             )
 
         self.assertTrue(self.cache["speech_detected"])
@@ -120,5 +113,5 @@ class TestPicoVoiceVAD(unittest.TestCase):
         self.vad.__del__()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

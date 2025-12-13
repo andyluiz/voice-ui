@@ -65,7 +65,7 @@ class AudioCapturingPlayer(QueuedAudioPlayer):
             item: Raw audio bytes to capture.
         """
         with self._lock:
-            logger.debug(f'Capturing {len(item)} bytes of audio')
+            logger.debug(f"Capturing {len(item)} bytes of audio")
             self._audio_chunks.append(item)
 
     def get_captured_audio(self) -> bytes:
@@ -76,7 +76,7 @@ class AudioCapturingPlayer(QueuedAudioPlayer):
             Concatenated audio bytes.
         """
         with self._lock:
-            return b''.join(self._audio_chunks)
+            return b"".join(self._audio_chunks)
 
     def clear(self) -> None:
         """Clear captured audio."""
@@ -88,8 +88,7 @@ def setup_logging(verbose: bool = False):
     """Configure logging."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
 
@@ -145,7 +144,9 @@ def generate_with_tts(
         output_path = output_dir / filename
 
         if output_path.exists() and not force:
-            logger.warning(f"File already exists: {output_path}. Use --force to overwrite.")
+            logger.warning(
+                f"File already exists: {output_path}. Use --force to overwrite."
+            )
             continue
 
         logger.info(f"Generating: {filename} (phrase: '{phrase}')")
@@ -188,10 +189,7 @@ def generate_with_tts(
             # OpenAI TTS produces 24 kHz mono 16-bit PCM
             logger.debug("Constructing AudioSegment from captured PCM...")
             audio = AudioSegment(
-                captured_audio,
-                frame_rate=24000,
-                sample_width=2,
-                channels=1
+                captured_audio, frame_rate=24000, sample_width=2, channels=1
             )
 
             # Normalize to 16 kHz mono 16-bit PCM
@@ -200,13 +198,14 @@ def generate_with_tts(
 
             # Save to file using pydub
             logger.debug(f"Exporting audio to {output_path}")
-            normalized_audio.export(str(output_path), format='wav')
+            normalized_audio.export(str(output_path), format="wav")
 
             logger.info(f"  Saved: {output_path} ({len(captured_audio)} bytes)")
 
         except Exception as e:
             logger.error(f"Error generating {filename}: {e}")
             import traceback
+
             logger.debug(traceback.format_exc())
             return False
 
@@ -232,7 +231,9 @@ def generate_with_microphone(
         output_path = output_dir / filename
 
         if output_path.exists() and not force:
-            logger.warning(f"File already exists: {output_path}. Use --force to overwrite.")
+            logger.warning(
+                f"File already exists: {output_path}. Use --force to overwrite."
+            )
             continue
 
         logger.info(f"Recording: {filename}")
@@ -250,20 +251,20 @@ def generate_with_microphone(
 
             with MicrophoneStream(rate=16000) as stream:
                 # Record audio for the specified duration
-                audio_data = b''
+                audio_data = b""
                 start_time = time.time()
 
                 for chunk in stream.generator():
                     audio_data += chunk
                     elapsed = time.time() - start_time
                     if elapsed % 0.5 < 0.05:  # Print every ~0.5 seconds
-                        print(f"  Recorded {elapsed:.1f}s...", end='\r')
+                        print(f"  Recorded {elapsed:.1f}s...", end="\r")
 
                     if elapsed >= duration:
                         break
 
             # Save to WAV file
-            with wave.open(str(output_path), 'wb') as wf:
+            with wave.open(str(output_path), "wb") as wf:
                 wf.setnchannels(1)  # Mono
                 wf.setsampwidth(2)  # 16-bit
                 wf.setframerate(16000)  # 16 kHz
@@ -277,6 +278,7 @@ def generate_with_microphone(
         except Exception as e:
             logger.error(f"Error recording {filename}: {e}")
             import traceback
+
             logger.debug(traceback.format_exc())
             return False
 
@@ -293,9 +295,11 @@ def list_tts_engines() -> bool:
 
 def parse_filenames_arg(arg: str) -> Tuple[str, str]:
     """Parse 'filename=phrase' argument."""
-    parts = arg.split('=', 1)
+    parts = arg.split("=", 1)
     if len(parts) != 2:
-        raise ValueError(f"Invalid filename arg: {arg}. Expected format: filename=phrase")
+        raise ValueError(
+            f"Invalid filename arg: {arg}. Expected format: filename=phrase"
+        )
     return parts[0], parts[1]
 
 
@@ -306,65 +310,65 @@ def main():
     )
 
     parser.add_argument(
-        '--mode',
-        choices=['tts', 'record'],
-        help='Generation mode: TTS or microphone recording',
+        "--mode",
+        choices=["tts", "record"],
+        help="Generation mode: TTS or microphone recording",
     )
     parser.add_argument(
-        '--tts-engine',
-        default='openai-tts',
-        help='TTS engine to use (default: openai-tts). See --list-engines.',
+        "--tts-engine",
+        default="openai-tts",
+        help="TTS engine to use (default: openai-tts). See --list-engines.",
     )
     parser.add_argument(
-        '--tts-params',
-        action='append',
+        "--tts-params",
+        action="append",
         default=[],
-        help='Additional TTS parameters as KEY=VALUE (repeatable).',
+        help="Additional TTS parameters as KEY=VALUE (repeatable).",
     )
     parser.add_argument(
-        '--filenames',
-        action='append',
+        "--filenames",
+        action="append",
         default=[],
-        dest='filenames_args',
-        help='Output filename and phrase: filename=phrase (repeatable). Example: --filenames hotword_alexa.wav=alexa',
+        dest="filenames_args",
+        help="Output filename and phrase: filename=phrase (repeatable). Example: --filenames hotword_alexa.wav=alexa",
     )
     parser.add_argument(
-        '--output-dir',
+        "--output-dir",
         type=Path,
-        default=Path('tests/resources/hotword'),
-        help='Output directory (default: tests/resources/hotword)',
+        default=Path("tests/resources/hotword"),
+        help="Output directory (default: tests/resources/hotword)",
     )
     parser.add_argument(
-        '--duration',
+        "--duration",
         type=float,
         default=2.0,
-        help='Recording duration in seconds (default: 2.0, record mode only)',
+        help="Recording duration in seconds (default: 2.0, record mode only)",
     )
     parser.add_argument(
-        '--device-index',
+        "--device-index",
         type=int,
         default=None,
-        help='Microphone device index (record mode only). Omit to use default device.',
+        help="Microphone device index (record mode only). Omit to use default device.",
     )
     parser.add_argument(
-        '--force',
-        action='store_true',
-        help='Overwrite existing files.',
+        "--force",
+        action="store_true",
+        help="Overwrite existing files.",
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be done without actually generating files.',
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without actually generating files.",
     )
     parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging.',
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging.",
     )
     parser.add_argument(
-        '--list-engines',
-        action='store_true',
-        help='List available TTS engines and exit.',
+        "--list-engines",
+        action="store_true",
+        help="List available TTS engines and exit.",
     )
 
     args = parser.parse_args()
@@ -390,11 +394,11 @@ def main():
     logger.info(f"Output dir: {args.output_dir}")
     logger.info(f"Files to generate: {len(filenames_map)}")
 
-    if args.mode == 'tts':
+    if args.mode == "tts":
         # Parse TTS params
         tts_params = {}
         for param_arg in args.tts_params:
-            key, val = param_arg.split('=', 1)
+            key, val = param_arg.split("=", 1)
             tts_params[key] = val
 
         success = generate_with_tts(
@@ -418,5 +422,5 @@ def main():
     return 0 if success else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -17,7 +17,11 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
     Uses GoogleTTSQueuedPlayer to manage TTS synthesis and playback.
     """
 
-    def __init__(self, player: Optional[Player] = None, queued_player: Optional[GoogleTTSQueuedPlayer] = None):
+    def __init__(
+        self,
+        player: Optional[Player] = None,
+        queued_player: Optional[GoogleTTSQueuedPlayer] = None,
+    ):
         """Initialize the Google TTS streamer.
 
         Args:
@@ -28,7 +32,9 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
 
         # If no custom queued_player provided, create one
         if queued_player is None:
-            queued_player = GoogleTTSQueuedPlayer(client=client, player=player, input_timeout=3)
+            queued_player = GoogleTTSQueuedPlayer(
+                client=client, player=player, input_timeout=3
+            )
 
         # Initialize parent with the custom queued player
         # Note: We pass queued_player directly so it uses our GoogleTTSQueuedPlayer
@@ -63,7 +69,7 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         logger.debug(f'Speaking text: "{text}"')
 
         # Queue the text using the specialized queued player method
-        if hasattr(self._queued_player, 'queue_text'):
+        if hasattr(self._queued_player, "queue_text"):
             self._queued_player.queue_text(text, voice=voice, **kwargs)
         else:
             # Fallback for base QueuedAudioPlayer (shouldn't happen with GoogleTTSQueuedPlayer)

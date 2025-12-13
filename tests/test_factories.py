@@ -11,7 +11,7 @@ class DummyTranscriber(SpeechToTextTranscriber):
     def name(cls):
         return cls.NAME
 
-    def transcribe(self, audio_data, prompt=''):
+    def transcribe(self, audio_data, prompt=""):
         return f"transcribed:{audio_data}"
 
 
@@ -64,7 +64,7 @@ class TestTranscriberFactory(unittest.TestCase):
 
         inst = TranscriberFactory.create(DummyTranscriber.NAME)
         self.assertIsInstance(inst, SpeechToTextTranscriber)
-        self.assertEqual(inst.transcribe('audio123'), 'transcribed:audio123')
+        self.assertEqual(inst.transcribe("audio123"), "transcribed:audio123")
 
         # Unregister and ensure creation now fails
         TranscriberFactory.unregister_transcriber(DummyTranscriber.NAME)
@@ -90,13 +90,13 @@ class TestTTSFactory(unittest.TestCase):
 
         inst = TTSFactory.create(DummyTTS.NAME)
         self.assertIsInstance(inst, TextToSpeechAudioStreamer)
-        inst.speak('hello', voice='v1')
-        self.assertEqual(inst._last, ('hello', 'v1'))
+        inst.speak("hello", voice="v1")
+        self.assertEqual(inst._last, ("hello", "v1"))
 
         TTSFactory.unregister_tts(DummyTTS.NAME)
         with self.assertRaises(RuntimeError):
             TTSFactory.create(DummyTTS.NAME)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

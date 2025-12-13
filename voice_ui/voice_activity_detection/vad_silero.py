@@ -30,31 +30,31 @@ class SileroVAD(IVoiceActivityDetector):
         elif isinstance(data, list):
             audio_frame = np.array(data)
         else:
-            raise ValueError(f'Invalid data type: {type(data)}')
+            raise ValueError(f"Invalid data type: {type(data)}")
 
         if cache is None:
-            raise ValueError('Cache is required for streaming VAD')
+            raise ValueError("Cache is required for streaming VAD")
 
-        if 'vad_iterator' not in cache:
-            cache['vad_iterator'] = silero_vad.VADIterator(
+        if "vad_iterator" not in cache:
+            cache["vad_iterator"] = silero_vad.VADIterator(
                 self._vad_model,
-                threshold=kwargs.get('threshold', 0.5),
-                speech_pad_ms=kwargs.get('pre_speech_duration', 0.1) * 1000,
-                min_silence_duration_ms=kwargs.get('post_speech_duration', 0.5) * 1000,
+                threshold=kwargs.get("threshold", 0.5),
+                speech_pad_ms=kwargs.get("pre_speech_duration", 0.1) * 1000,
+                min_silence_duration_ms=kwargs.get("post_speech_duration", 0.5) * 1000,
             )
 
-        if 'speech_detected' not in cache:
-            cache['speech_detected'] = False
+        if "speech_detected" not in cache:
+            cache["speech_detected"] = False
 
-        speech_dict = cache['vad_iterator'](audio_frame, return_seconds=True)
+        speech_dict = cache["vad_iterator"](audio_frame, return_seconds=True)
 
         if not speech_dict:
-            return cache['speech_detected']
+            return cache["speech_detected"]
 
-        if 'start' in speech_dict:
-            cache['speech_detected'] = True
+        if "start" in speech_dict:
+            cache["speech_detected"] = True
 
-        if 'end' in speech_dict:
-            cache['speech_detected'] = False
+        if "end" in speech_dict:
+            cache["speech_detected"] = False
 
-        return cache['speech_detected']
+        return cache["speech_detected"]

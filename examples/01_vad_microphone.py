@@ -30,13 +30,13 @@ def main():
             for chunk in stream.generator():
                 if not voice_detected:
                     voice_detected = True
-                    print('Start of speech detected')
+                    print("Start of speech detected")
 
                 if len(chunk) > 0:
                     wav_file.writeframes(chunk)
                 else:
                     voice_detected = False
-                    print('End of speech detected')
+                    print("End of speech detected")
 
     except (EOFError, KeyboardInterrupt):
         pass

@@ -37,7 +37,7 @@ def main():
         voice_profiles_dir=Path(os.path.join(Path(__file__).parent, "voice_profiles")),
         post_speech_duration=1.0,
         max_speech_duration=10,
-        tts_engine='google',
+        tts_engine="google",
     )
 
     voice_ui = VoiceUI(
@@ -61,10 +61,14 @@ def main():
             print_event(f"{Fore.GREEN}Speech end detected{Fore.RESET}")
 
         elif isinstance(event, PartialTranscriptionEvent):
-            print_event(f"{Fore.YELLOW}Partial transcription event. Text: \"{text}\", Speaker: {event.get('speaker')}{Fore.RESET}")
+            print_event(
+                f"{Fore.YELLOW}Partial transcription event. Text: \"{text}\", Speaker: {event.get('speaker')}{Fore.RESET}"
+            )
 
         elif isinstance(event, TranscriptionEvent):
-            print_event(f"{Fore.GREEN}Transcription event. Text: \"{text}\", Speaker: {event.get('speaker')}{Fore.RESET}")
+            print_event(
+                f"{Fore.GREEN}Transcription event. Text: \"{text}\", Speaker: {event.get('speaker')}{Fore.RESET}"
+            )
 
             # Repeat what the user said
             voice_ui.speak(text)
@@ -74,8 +78,12 @@ def main():
 
     # Detect speech
     voice_ui.start()
-    print(f"{Fore.MAGENTA}Start speaking. What you say will be repeated back to you.{Fore.RESET}")
-    print(f"{Fore.MAGENTA}You can interrupt at any moment by speaking over it.{Fore.RESET}")
+    print(
+        f"{Fore.MAGENTA}Start speaking. What you say will be repeated back to you.{Fore.RESET}"
+    )
+    print(
+        f"{Fore.MAGENTA}You can interrupt at any moment by speaking over it.{Fore.RESET}"
+    )
 
     while True:
         try:

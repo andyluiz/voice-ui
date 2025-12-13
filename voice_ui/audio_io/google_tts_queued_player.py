@@ -23,7 +23,12 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
     items are handled without duplicating threading/queue management code.
     """
 
-    def __init__(self, client: texttospeech.TextToSpeechClient, player: Optional[Player] = None, input_timeout: float = 3):
+    def __init__(
+        self,
+        client: texttospeech.TextToSpeechClient,
+        player: Optional[Player] = None,
+        input_timeout: float = 3,
+    ):
         """
         Initialize the GoogleTTSQueuedPlayer.
 
@@ -58,7 +63,7 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
             config_request = texttospeech.StreamingSynthesizeRequest(
                 streaming_config=texttospeech.StreamingSynthesizeConfig(
                     voice=texttospeech.VoiceSelectionParams(
-                        language_code=(kwargs or {}).get('language_code', "en-US"),
+                        language_code=(kwargs or {}).get("language_code", "en-US"),
                         name=voice if voice else "en-US-Journey-D",
                     )
                 )
@@ -67,13 +72,13 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
             streaming_responses = self._client.streaming_synthesize(
                 requests=itertools.chain(
                     [config_request],
-                    self._synthesize_request_generator(starting_text=text)
+                    self._synthesize_request_generator(starting_text=text),
                 )
             )
 
             for response in streaming_responses:
                 if self.is_stopped():
-                    logger.debug('Stream is stopped. Leaving.')
+                    logger.debug("Stream is stopped. Leaving.")
                     break
 
                 if response.audio_content:
@@ -82,11 +87,11 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
             self._speaking = False
 
         except exceptions.GoogleAPIError as e:
-            logger.error(f'Google API error: {e}')
+            logger.error(f"Google API error: {e}")
             self._speaking = False
 
         except Exception as e:
-            logger.error(f'Error while synthesizing/playing audio: {e}')
+            logger.error(f"Error while synthesizing/playing audio: {e}")
             self._speaking = False
 
     def _synthesize_request_generator(self, starting_text: str):
@@ -100,7 +105,7 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
                 # Get more text from the queue while synthesizing
                 (text, _, _) = self._data_queue.get(timeout=self._input_timeout)
             except queue.Empty:
-                logger.debug('No more text to synthesize')
+                logger.debug("No more text to synthesize")
                 return
 
             logger.debug(f'Streaming additional text: "{text}"')

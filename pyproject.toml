@@ -67,3 +67,6 @@ dev = [
   "flake8",
   "isort",
 ]
+
+[tool.black]
+preview = false

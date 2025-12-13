@@ -19,9 +19,9 @@ class FakeAudioSegment:
     def export(self, filename, format=None):
         # create a small wav file content
         # Handle both file paths (str) and BytesIO objects
-        content = b'RIFF'
+        content = b"RIFF"
         if isinstance(filename, (str, bytes)):
-            with open(filename, 'wb') as f:
+            with open(filename, "wb") as f:
                 f.write(content)
         else:
             # Assume it's a file-like object (BytesIO)
@@ -38,7 +38,7 @@ class FakeOpenAIClient:
             @staticmethod
             def create(**kwargs):
                 class R:
-                    text = ' hello '
+                    text = " hello "
 
                 return R()
 
@@ -53,13 +53,15 @@ class TestWhisperTranscriber(unittest.TestCase):
         ow.openai.OpenAI = FakeOpenAIClient
 
         orig_from_raw = ow.AudioSegment.from_raw
-        ow.AudioSegment.from_raw = lambda b, sample_width, frame_rate, channels: FakeAudioSegment(b)
+        ow.AudioSegment.from_raw = (
+            lambda b, sample_width, frame_rate, channels: FakeAudioSegment(b)
+        )
 
         orig_detect = ow.silence.detect_leading_silence
         ow.silence.detect_leading_silence = lambda s: 0
 
         # ensure env var exists
-        os.environ['OPENAI_API_KEY'] = 'x'
+        os.environ["OPENAI_API_KEY"] = "x"
 
         try:
             t = ow.WhisperTranscriber()
@@ -69,13 +71,13 @@ class TestWhisperTranscriber(unittest.TestCase):
                 pass
 
             a = A()
-            a.content = b'\x00\x01' * 100
+            a.content = b"\x00\x01" * 100
             a.sample_size = 2
             a.rate = 16000
             a.channels = 1
 
-            res = t.transcribe(a, prompt='p')
-            self.assertEqual(res, 'hello')
+            res = t.transcribe(a, prompt="p")
+            self.assertEqual(res, "hello")
 
             # test calculate_rms with known frames
             arr = np.array([0, 32767, -32768], dtype=np.int16)
@@ -88,5 +90,5 @@ class TestWhisperTranscriber(unittest.TestCase):
             ow.silence.detect_leading_silence = orig_detect
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

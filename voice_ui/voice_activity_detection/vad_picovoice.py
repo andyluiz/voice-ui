@@ -15,8 +15,7 @@ logger = logging.getLogger(__name__)
 class PicoVoiceVAD(IVoiceActivityDetector):
     def __init__(self, library_path: Optional[str] = None):
         self._cobra = pvcobra.create(
-            access_key=os.environ['PORCUPINE_ACCESS_KEY'],
-            library_path=library_path
+            access_key=os.environ["PORCUPINE_ACCESS_KEY"], library_path=library_path
         )
 
     def __del__(self):
@@ -61,14 +60,14 @@ class PicoVoiceVAD(IVoiceActivityDetector):
         threshold: float = 0.7,
         pre_speech_duration: float = 0.2,
         post_speech_duration: float = 1.0,
-        **kwargs
+        **kwargs,
     ) -> bool:
         if isinstance(data, bytes):
             audio_frame = self._convert_data(data)
         elif isinstance(data, list):
             audio_frame = data
         else:
-            raise ValueError(f'Invalid data type: {type(data)}')
+            raise ValueError(f"Invalid data type: {type(data)}")
 
         # Calculate chunk durations
         start_chunks, end_chunks = map(
@@ -83,12 +82,16 @@ class PicoVoiceVAD(IVoiceActivityDetector):
 
         voice_probability = self._cobra.process(audio_frame)
 
-        logger.debug(f'VAD result: {voice_probability}')
+        logger.debug(f"VAD result: {voice_probability}")
 
         cache["threshold_counter"].append(voice_probability)
-        cache["processed_audio_length_ms"] += 1000 * self.frame_length / self.sample_rate
+        cache["processed_audio_length_ms"] += (
+            1000 * self.frame_length / self.sample_rate
+        )
 
-        acc_voice_probability = sum(cache["threshold_counter"]) / len(cache["threshold_counter"])
+        acc_voice_probability = sum(cache["threshold_counter"]) / len(
+            cache["threshold_counter"]
+        )
         # logger.debug(
         #     "Voice Probability: {:.2f}%, threshold: {:.2f}%".format(acc_voice_probability, threshold)
         # )
@@ -113,7 +116,10 @@ class PicoVoiceVAD(IVoiceActivityDetector):
             # )
 
         # Detect start of speech
-        if not cache["speech_detected"] and cache["above_threshold_counter"] >= start_chunks:
+        if (
+            not cache["speech_detected"]
+            and cache["above_threshold_counter"] >= start_chunks
+        ):
             cache["speech_detected"] = True
 
         # Detect end of speech

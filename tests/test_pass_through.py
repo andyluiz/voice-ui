@@ -24,10 +24,10 @@ class TestPassThroughStreamer(unittest.TestCase):
             streamer = pts_mod.PassThroughTextToSpeechAudioStreamer()
 
             # speak raw bytes
-            streamer.speak(b'abc')
+            streamer.speak(b"abc")
 
             # speak AudioData
-            ad = AudioData(content=b'def', sample_size=2, rate=16000, channels=1)
+            ad = AudioData(content=b"def", sample_size=2, rate=16000, channels=1)
             streamer.speak(ad)
 
             # allow the background thread to process
@@ -39,5 +39,5 @@ class TestPassThroughStreamer(unittest.TestCase):
             pts_mod.Player = orig_player
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

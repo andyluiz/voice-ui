@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 def google_speech_v2_recognize(
     stream,
     project_id: str = None,
-    language_codes: list[str] = ['en-US'],
-    prefix: str = '',
+    language_codes: list[str] = ["en-US"],
+    prefix: str = "",
     speech_start_timeout: int = 10,
     speech_end_timeout: int = 3,
-    recognition_model: str = 'latest_long'
+    recognition_model: str = "latest_long",
 ):
     """
     Recognizes speech from an audio stream using Google Speech v2 API.
@@ -37,7 +37,7 @@ def google_speech_v2_recognize(
         cloud_speech.StreamingRecognizeResponse: The response from the API.
     """
     if project_id is None:
-        project_id = os.environ['GOOGLE_PROJECT_ID']
+        project_id = os.environ["GOOGLE_PROJECT_ID"]
 
     # diarization_config = cloud_speech.SpeakerDiarizationConfig(
     #     min_speaker_count=None,
@@ -83,10 +83,11 @@ def google_speech_v2_recognize(
     audio_generator = stream.generator()
 
     audio_requests = (
-        cloud_speech.StreamingRecognizeRequest(audio=content) for content in audio_generator
+        cloud_speech.StreamingRecognizeRequest(audio=content)
+        for content in audio_generator
     )
 
-    print(prefix, end='', flush=True)
+    print(prefix, end="", flush=True)
 
     def requests(rec_config: cloud_speech.RecognitionConfig, audio: list) -> list:
         yield rec_config
@@ -134,10 +135,10 @@ def google_speech_v2_recognize(
             # print(prefix + transcript)
 
             result = {
-                'text': transcript,
-                'confidence': result.alternatives[0].confidence,
-                'language_code': result.language_code,
-                'total_billed_time': response.metadata.total_billed_duration.seconds,
+                "text": transcript,
+                "confidence": result.alternatives[0].confidence,
+                "language_code": result.language_code,
+                "total_billed_time": response.metadata.total_billed_duration.seconds,
             }
             transcripts.append(result)
             logger.debug(f"Speech transcript: {result}")
@@ -149,42 +150,38 @@ def google_speech_v2_recognize(
     result = None
     if len(transcripts) > 0:
         result = {
-            'text': ' '.join([t['text'].strip() for t in transcripts]),
+            "text": " ".join([t["text"].strip() for t in transcripts]),
             # 'confidence': 0,
-            'language_code': ','.join(list(set([t['language_code'].strip() for t in transcripts]))),
-            'total_billed_time': sum([t['total_billed_time'] for t in transcripts]),
+            "language_code": ",".join(
+                list(set([t["language_code"].strip() for t in transcripts]))
+            ),
+            "total_billed_time": sum([t["total_billed_time"] for t in transcripts]),
         }
-        print(prefix + result['text'])
+        print(prefix + result["text"])
 
     logger.debug(f"Speech transcript: {result}")
     return result
 
 
-def listen(
-    stream,
-    language_codes=[],
-    **kwargs
-):
+def listen(stream, language_codes=[], **kwargs):
     language_codes = list(set(language_codes + ["en-US"]))
 
     return google_speech_v2_recognize(
-        project_id=os.environ['GOOGLE_PROJECT_ID'],
+        project_id=os.environ["GOOGLE_PROJECT_ID"],
         stream=stream,
         language_codes=language_codes,
-        **kwargs
+        **kwargs,
     )
 
 
 def transcribe_file(
-    speech_file: str,
-    language_code: str = "en-US",
-    alternative_language_codes=None
+    speech_file: str, language_code: str = "en-US", alternative_language_codes=None
 ):
     """Transcribe the given audio file."""
     import sox
 
     tfm = sox.Transformer()
-    tfm.set_output_format(file_type='wav', rate=16000)
+    tfm.set_output_format(file_type="wav", rate=16000)
     content = tfm.build_array(input_filepath=speech_file)
 
     # with open('audio.wav', "rb") as audio_file:
@@ -216,7 +213,7 @@ def transcribe_file(
         # The first alternative is the most likely one for this portion.
         transcripts.append(result.alternatives[0].transcript.strip())
 
-    return '\n'.join(transcripts)
+    return "\n".join(transcripts)
 
 
 # if __name__ == "__main__":

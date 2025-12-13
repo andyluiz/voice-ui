@@ -40,7 +40,7 @@ class LocalWhisperTranscriber(SpeechToTextTranscriber):
                 audio,
                 # We use past transcriptions to condition the model
                 initial_prompt=prompt,
-                verbose=True  # to avoid progress bar
+                verbose=True,  # to avoid progress bar
             )
 
         return transcription

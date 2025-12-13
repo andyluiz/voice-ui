@@ -28,7 +28,9 @@ class FunASRVAD(IVoiceActivityDetector):
         output = output / np.iinfo(np.int16).max  # Normalize to [-1.0, 1.0]
         return output
 
-    def process(self, data: Union[bytes, List], cache, chunk_size=None, **kwargs) -> bool:
+    def process(
+        self, data: Union[bytes, List], cache, chunk_size=None, **kwargs
+    ) -> bool:
         """
         Process the audio data and return True if speech is detected in the data interval, False otherwise.
         """
@@ -37,16 +39,16 @@ class FunASRVAD(IVoiceActivityDetector):
         elif isinstance(data, list):
             audio_frame = np.array(data)
         else:
-            raise ValueError(f'Invalid data type: {type(data)}')
+            raise ValueError(f"Invalid data type: {type(data)}")
 
         if cache is None:
-            raise ValueError('Cache is required for streaming VAD')
+            raise ValueError("Cache is required for streaming VAD")
 
-        if 'speech_in_progress' not in cache:
-            cache['speech_in_progress'] = False
+        if "speech_in_progress" not in cache:
+            cache["speech_in_progress"] = False
 
-        if 'vad_cache' not in cache:
-            cache['vad_cache'] = {}
+        if "vad_cache" not in cache:
+            cache["vad_cache"] = {}
 
         if chunk_size is None:
             chunk_size = self._frame_length_ms
@@ -58,36 +60,36 @@ class FunASRVAD(IVoiceActivityDetector):
         # []：Indicates that neither a starting point nor an ending point has been detected.
         vad_res = self._vad.generate(
             input=audio_frame,
-            cache=cache['vad_cache'],
+            cache=cache["vad_cache"],
             is_final=False,
             chunk_size=chunk_size,
             disable_pbar=True,
             **kwargs,
         )
 
-        logger.debug(f'VAD result: {vad_res}')
+        logger.debug(f"VAD result: {vad_res}")
 
         if not vad_res:
-            return cache['speech_in_progress']
+            return cache["speech_in_progress"]
 
-        if not vad_res[0]['value']:
-            return cache['speech_in_progress']
+        if not vad_res[0]["value"]:
+            return cache["speech_in_progress"]
 
-        value = vad_res[0]['value'][0]
+        value = vad_res[0]["value"][0]
 
         # Return true if speech is in progress, false otherwise.
         starting_point_detected = value[0] != -1
         ending_point_detected = value[1] != -1
         if starting_point_detected and not ending_point_detected:
-            cache['speech_in_progress'] = True
+            cache["speech_in_progress"] = True
             return True
 
         if not starting_point_detected and ending_point_detected:
-            cache['speech_in_progress'] = False
+            cache["speech_in_progress"] = False
             return True
 
         if starting_point_detected and ending_point_detected:
-            cache['speech_in_progress'] = False
+            cache["speech_in_progress"] = False
             return True
 
-        return cache['speech_in_progress']
+        return cache["speech_in_progress"]

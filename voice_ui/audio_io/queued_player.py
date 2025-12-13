@@ -37,7 +37,7 @@ class QueuedAudioPlayer:
         self._speaker_thread = threading.Thread(
             target=self._speaker_thread_function,
             daemon=True,
-            name='QueuedAudioPlayerThread'
+            name="QueuedAudioPlayerThread",
         )
 
         self._data_queue = queue.Queue()
@@ -61,7 +61,7 @@ class QueuedAudioPlayer:
                 continue
             except Exception as e:
                 self._speaking = False
-                logger.error(f'Error while processing queue item: {e}')
+                logger.error(f"Error while processing queue item: {e}")
 
     def _get_queue_timeout(self) -> float:
         """Get the timeout for queue.get(). Override for custom timeouts."""
@@ -89,7 +89,7 @@ class QueuedAudioPlayer:
         Args:
             audio_data: Raw audio bytes to play.
         """
-        logger.debug(f'Queuing {len(audio_data)} bytes of audio')
+        logger.debug(f"Queuing {len(audio_data)} bytes of audio")
         self._data_queue.put(audio_data)
 
     def queue_size(self) -> int:

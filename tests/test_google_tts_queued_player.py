@@ -20,7 +20,7 @@ class DummyThread:
 class TestGoogleTTSQueuedPlayer(unittest.TestCase):
     def setUp(self):
         # Prevent the background thread from starting
-        patcher = patch.object(queued_player_mod.threading, 'Thread', new=DummyThread)
+        patcher = patch.object(queued_player_mod.threading, "Thread", new=DummyThread)
         self.addCleanup(patcher.stop)
         patcher.start()
 
@@ -29,7 +29,9 @@ class TestGoogleTTSQueuedPlayer(unittest.TestCase):
         self.client = MagicMock()
 
         # Instance under test
-        self.player_instance = google_tts_mod.GoogleTTSQueuedPlayer(client=self.client, player=self.player)
+        self.player_instance = google_tts_mod.GoogleTTSQueuedPlayer(
+            client=self.client, player=self.player
+        )
 
     def tearDown(self):
         try:
@@ -38,10 +40,10 @@ class TestGoogleTTSQueuedPlayer(unittest.TestCase):
             pass
 
     def test_queue_text_trims_and_puts_into_queue(self):
-        self.player_instance.queue_text('  hello  ', voice='V', language_code='en-GB')
+        self.player_instance.queue_text("  hello  ", voice="V", language_code="en-GB")
         item = self.player_instance._data_queue.get_nowait()
-        self.assertEqual(item[0], 'hello')
-        self.assertEqual(item[1], 'V')
+        self.assertEqual(item[0], "hello")
+        self.assertEqual(item[1], "V")
         self.assertIsInstance(item[2], dict)
 
     def test_process_queue_item_plays_audio_and_resets_speaking(self):
@@ -49,9 +51,13 @@ class TestGoogleTTSQueuedPlayer(unittest.TestCase):
             def __init__(self, audio_content):
                 self.audio_content = audio_content
 
-        self.client.streaming_synthesize.return_value = iter([Resp(b'abc'), Resp(b'def')])
+        self.client.streaming_synthesize.return_value = iter(
+            [Resp(b"abc"), Resp(b"def")]
+        )
 
-        self.player_instance._process_queue_item(("hi", None, {'language_code': 'en-US'}))
+        self.player_instance._process_queue_item(
+            ("hi", None, {"language_code": "en-US"})
+        )
 
         self.assertTrue(self.player.play_data.called)
         self.assertFalse(self.player_instance._speaking)
@@ -60,15 +66,15 @@ class TestGoogleTTSQueuedPlayer(unittest.TestCase):
         class DummyGoogleAPIError(Exception):
             pass
 
-        with patch.object(google_tts_mod, 'exceptions') as exc_mod:
+        with patch.object(google_tts_mod, "exceptions") as exc_mod:
             exc_mod.GoogleAPIError = DummyGoogleAPIError
-            self.client.streaming_synthesize.side_effect = DummyGoogleAPIError('boom')
+            self.client.streaming_synthesize.side_effect = DummyGoogleAPIError("boom")
 
             self.player_instance._process_queue_item(("hi", None, {}))
             self.assertFalse(self.player_instance._speaking)
 
     def test_process_queue_item_handles_generic_exception(self):
-        self.client.streaming_synthesize.side_effect = RuntimeError('boom')
+        self.client.streaming_synthesize.side_effect = RuntimeError("boom")
         self.player_instance._process_queue_item(("hi", None, {}))
         self.assertFalse(self.player_instance._speaking)
 

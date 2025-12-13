@@ -24,7 +24,7 @@ class WhisperTranscriber(SpeechToTextTranscriber):
                 io.BytesIO(audio_data.content),
                 sample_width=audio_data.sample_size,
                 frame_rate=audio_data.rate,
-                channels=audio_data.channels
+                channels=audio_data.channels,
             )
 
             # Trim the audio to remove silence
@@ -32,7 +32,7 @@ class WhisperTranscriber(SpeechToTextTranscriber):
             end_trim = silence.detect_leading_silence(sound.reverse())
 
             duration = len(sound)
-            trimmed_sound = sound[start_trim:(duration - end_trim)]
+            trimmed_sound = sound[start_trim : (duration - end_trim)]
 
             # Export to a BytesIO buffer instead of a temporary file
             audio_file = io.BytesIO()

@@ -13,7 +13,7 @@ class Player:
         channels: int = 1,
         rate: int = 24_000,
         device_name: Optional[str] = None,
-        device_index: Optional[int] = None
+        device_index: Optional[int] = None,
     ):
         if device_name is not None:
             device_index = self.find_device_index(device_name)
@@ -28,7 +28,7 @@ class Player:
             rate=rate,
             frames_per_buffer=4096,
             output=True,
-            output_device_index=device_index
+            output_device_index=device_index,
         )
 
     def __del__(self):
@@ -42,15 +42,17 @@ class Player:
 
         for i in range(device_count):
             info = self._audio_interface.get_device_info_by_index(i)
-            if (capture_devices and info['maxInputChannels'] > 0) or (not capture_devices and info['maxOutputChannels'] > 0):
-                devices.append(info['name'])
+            if (capture_devices and info["maxInputChannels"] > 0) or (
+                not capture_devices and info["maxOutputChannels"] > 0
+            ):
+                devices.append(info["name"])
 
         return tuple(devices)
 
     def find_device_index(self, device_name: str) -> int:
         for i in range(self._audio_interface.get_device_count()):
             info = self._audio_interface.get_device_info_by_index(i)
-            if info['name'] == device_name:
+            if info["name"] == device_name:
                 return i
         raise RuntimeError(f"Device `{device_name}` not found")
 
@@ -67,20 +69,20 @@ class Player:
         self,
         file_path: str,
         device_name: Optional[str] = None,
-        device_index: Optional[int] = None
+        device_index: Optional[int] = None,
     ):
         if device_name is not None:
             device_index = self.find_device_index(device_name)
 
         chunk = 2048
 
-        with wave.open(file_path, 'rb') as wf:
+        with wave.open(file_path, "rb") as wf:
             stream = self._audio_interface.open(
                 format=self._audio_interface.get_format_from_width(wf.getsampwidth()),
                 channels=wf.getnchannels(),
                 rate=wf.getframerate(),
                 output=True,
-                output_device_index=device_index
+                output_device_index=device_index,
             )
 
             while len(data := wf.readframes(chunk)):
