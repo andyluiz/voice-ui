@@ -34,7 +34,7 @@ tests:
 	@echo Running tests
 	$(COVERAGE) erase
 	$(COVERAGE) run -m unittest discover -v
-	$(COVERAGE) report --omit='tests/*.py' -m -i --fail-under=75
+	$(COVERAGE) report --omit='tests/*.py' -m -i --fail-under=90
 	$(COVERAGE) html -i
 
 .PHONY: online_tests
@@ -50,7 +50,7 @@ TEST_FILE :=
 test:
 	@echo Running tests
 	$(COVERAGE) run --omit='tests/*.py' -m unittest -v $(subst /,.,$(basename $(TEST_FILE)))
-	$(COVERAGE) report -m -i --fail-under=75
+	$(COVERAGE) report -m -i --fail-under=90
 
 .PHONY: compile
 compile:

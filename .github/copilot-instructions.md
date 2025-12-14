@@ -69,7 +69,7 @@ Install as needed: `pip install .[openai,google,silero]` or use `make venv` (ins
 | **Online Integration** | `make online_tests` | API keys, network | Real cloud providers, hardware |
 | **Single module** | `make test TEST_FILE=tests/path/to/file.py` | Varies | Isolated testing during dev |
 
-**Coverage**: Makefile enforces `--fail-under=75` coverage. HTML report in `htmlcov/` after `make tests`.
+**Coverage**: Makefile enforces `--fail-under=90` coverage. HTML report in `htmlcov/` after `make tests`.
 
 ## Development Workflows & Patterns
 
