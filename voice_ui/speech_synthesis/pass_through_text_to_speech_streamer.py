@@ -72,7 +72,7 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
 
     def speak(
         self,
-        text: Union[AudioData, bytes],
+        data: Union[AudioData, bytes],
         **kwargs,
     ):
         """
@@ -85,15 +85,15 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
         Raises:
             AttributeError: If text is a string (this streamer does not support text).
         """
-        if isinstance(text, str):
+        if isinstance(data, str):
             raise AttributeError("This stream does not support text")
 
         # Resume playback if it was stopped
         self.resume()
 
-        if isinstance(text, AudioData):
-            audio_data = text.content
+        if isinstance(data, AudioData):
+            audio_data = data.content
         else:
-            audio_data = text
+            audio_data = data
 
         self._queued_player.queue_audio(audio_data)
