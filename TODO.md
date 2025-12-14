@@ -2,7 +2,7 @@
 
 ## Hotword detections
 
-- Move HotwordDetector class to its own file
+- ~~Move HotwordDetector class to its own file~~
 - Define the return type of the `process()` function.
   - Suggestions:
     - the name of the detected keyword
@@ -17,18 +17,6 @@
 ## Testing
 
 - Create functional tests to check VAD, Speech Synthesis, and Speech Detection and Recognition.
-
-### Functional tests (new)
-
-- Location: `tests/functional`
-- Run locally: create and activate venv, then run `make functional_tests` or:
-
-```bash
-source .venv/bin/activate
-python -m unittest discover -v tests/functional
-```
-
-- Note: These functional tests are designed to be offline and CI-friendly. Online/integration tests that require API keys or microphone hardware remain gated and are run separately (see `make online_tests`).
 
 ### Online integration tests (gated)
 
@@ -53,12 +41,10 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-creds.json
 make online_tests
 ```
 
-- CI: put online tests behind a dedicated pipeline or job that runs only when secrets are configured and approved (do NOT run by default on forks).
-
 ## Others
 
 - Create a configuration class for VoiceUI to replace the dictionary.
-  - The dictionary is too loose and don't explicitly specify the available settings and their defaults
+  - ~~The dictionary is too loose and don't explicitly specify the available settings and their defaults~~
   - Implement a read-config-from-file functionality
 
 - Update diagram

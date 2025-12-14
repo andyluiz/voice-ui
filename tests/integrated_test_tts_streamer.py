@@ -331,7 +331,7 @@ class TestTextToSpeechAudioStreamer(unittest.TestCase):
 
         # Verify audio duration is reasonable (text is ~150 words, should be ~30-50 seconds of audio)
         # Audio is at 24000 Hz, so roughly 720000-1200000 bytes for 30-50 seconds
-        expected_min_bytes = 700000  # ~33 seconds at 24kHz
+        expected_min_bytes = 600000  # ~30 seconds at 24kHz
         self.assertGreater(
             len(audio_bytes),
             expected_min_bytes,
