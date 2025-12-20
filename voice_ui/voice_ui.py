@@ -286,11 +286,24 @@ class VoiceUI:
             try:
                 item = self._speaker_queue.get(timeout=1)
 
-                try:
-                    (text, tts_kwargs) = item
-                except (ValueError, TypeError) as e:
-                    logger.error(f"Invalid queue item for TTS: {item!r}, error: {e}")
-                    continue
+                if isinstance(item, str):
+                    text, tts_kwargs = item, {}
+                else:
+                    try:
+                        (text, tts_kwargs) = item
+                    except (ValueError, TypeError) as e:
+                        logger.error(
+                            f"Invalid queue item for TTS: {item!r}, error: {e}"
+                        )
+                        continue
+
+                    if tts_kwargs is None:
+                        tts_kwargs = {}
+                    elif not isinstance(tts_kwargs, dict):
+                        logger.error(
+                            f"Invalid TTS kwargs type: {type(tts_kwargs)!r} for item: {item!r}"
+                        )
+                        continue
 
                 # if not self._voice_output_enabled:
                 #     continue
