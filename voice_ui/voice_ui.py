@@ -1,33 +1,25 @@
 import logging
-import os
 import queue
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
+from .config import VoiceUIConfig
 from .speech_detection.speech_detector import (
+    HotwordDetectedEvent,
     MetaDataEvent,
     PartialSpeechEndedEvent,
     SpeechDetector,
     SpeechEndedEvent,
     SpeechEvent,
     SpeechStartedEvent,
+    WaitingForHotwordEvent,
 )
-from .speech_recognition import (
-    speech_to_text_transcriber_factory as transcriber_factory,
-)
-from .speech_recognition.speech_to_text_transcriber import SpeechToTextTranscriber
-from .speech_synthesis import text_to_speech_streamer_factory as tts_factory
-from .speech_synthesis.text_to_speech_streamer import TextToSpeechAudioStreamer
+from .speech_recognition import SpeechToTextTranscriber, TranscriberFactory
+from .speech_synthesis import TextToSpeechAudioStreamer, TTSFactory
 
-
-class WaitingForHotwordEvent(SpeechEvent):
-    pass
-
-
-class HotwordDetectedEvent(SpeechEvent):
-    pass
+logger = logging.getLogger(__name__)
 
 
 class PartialTranscriptionEvent(SpeechEvent):
@@ -41,31 +33,37 @@ class TranscriptionEvent(SpeechEvent):
 class VoiceUI:
     def __init__(
         self,
-        speech_callback: Callable[SpeechEvent, bool],
-        config: Optional[Dict] = None,
+        speech_callback: Callable[[SpeechEvent], bool],
+        config: Optional[VoiceUIConfig] = None,
     ):
-        self._config = config if config else {}
+        self._config = config if config else VoiceUIConfig()
         self._terminated = True
         self._speech_callback = speech_callback
 
         # Voice input
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
-            pv_access_key=os.environ['PORCUPINE_ACCESS_KEY'],
-            callback=lambda event: self._speech_events.put(event),
-            speaker_profiles_dir=self._config.get('voice_profiles_dir'),
-            pre_speech_audio_length=self._config.get('pre_speech_audio_length', 1.0),  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
-            post_speech_duration=self._config.get('post_speech_duration', 1.0),
-            max_speech_duration=self._config.get('max_speech_duration', 10),
+            on_speech_event=lambda event: self._speech_events.put(event),
+            speaker_profiles_dir=self._config.voice_profiles_dir,
+            threshold=self._config.vad_threshold,
+            pre_speech_duration=self._config.pre_speech_duration,  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
+            post_speech_duration=self._config.post_speech_duration,
+            max_speech_duration=self._config.max_speech_duration,
+            additional_keyword_paths=self._config.additional_keyword_paths,
+            vad_engine=self._config.vad_engine,
         )
         self._speech_event_handler_thread = None
 
         # Voice transcriber
-        self._audio_transcriber: SpeechToTextTranscriber = transcriber_factory.create_transcriber(self._config.get('audio_transcriber', 'whisper'))
+        self._audio_transcriber: SpeechToTextTranscriber = TranscriberFactory.create(
+            self._config.audio_transcriber
+        )
 
         # Voice output
         self._speaker_queue = queue.Queue()
-        self._tts_streamer: TextToSpeechAudioStreamer = tts_factory.create_tts_streamer(self._config.get('tts_engine', 'openai-tts'))
+        self._tts_streamer: TextToSpeechAudioStreamer = TTSFactory.create(
+            self._config.tts_engine
+        )
 
     def _speech_event_handler(self):
         """
@@ -83,7 +81,7 @@ class VoiceUI:
 
         The method runs until the `_terminated` flag is set.
         """
-        user_input = ''
+        user_input = ""
         self._last_speech_event_at = datetime.now()
 
         def safe_callback_call(*args, **kwargs):
@@ -93,7 +91,7 @@ class VoiceUI:
             try:
                 self._speech_callback(*args, **kwargs)
             except Exception as e:
-                logging.error(f'Error in speech callback: {str(e)}')
+                logger.error(f"Error in speech callback: {str(e)}")
 
         # Keep listening until an utterance is detected
         while not self._terminated:
@@ -109,37 +107,78 @@ class VoiceUI:
                 # If no speech event is received within 1 second
                 now = datetime.now()
                 if self.is_speaking():
+                    logger.debug("Still speaking, update last speech event timestamp.")
                     # If the TTS is currently speaking, update the last speech event time
                     self._last_speech_event_at = now
                     continue
 
-                hotword_inactivity_timeout = self._config.get('hotword_inactivity_timeout')
-                if hotword_inactivity_timeout and (now - self._last_speech_event_at) > timedelta(seconds=hotword_inactivity_timeout):
-                    # If no speech event is received for 30 seconds
-                    self._speech_detector.stop()
-                    # Call the speech callback to indicate waiting for hotword
-                    safe_callback_call(event=WaitingForHotwordEvent())
-                    user_input = ''
+                # Handle inactivity
+                hotword_inactivity_timeout = self._config.hotword_inactivity_timeout
 
-                    # Detect the hotword
-                    self._speech_detector.detect_hot_keyword(
-                        additional_keyword_paths=self._config.get('additional_keyword_paths', {})
-                    )
+                # If the hotword inactivity timeout is not set or not a valid number, skip
+                if hotword_inactivity_timeout is None or not isinstance(
+                    hotword_inactivity_timeout, (float, int)
+                ):
+                    continue
 
-                    # Call the speech callback to indicate hotword detected
-                    safe_callback_call(event=HotwordDetectedEvent())
-                    self._speech_detector.start()
-                    self._last_speech_event_at = datetime.now()
+                # If already in hotword detection mode, skip
+                if (
+                    self._speech_detector.detection_mode
+                    == SpeechDetector.DetectionMode.HOTWORD
+                ):
+                    continue
+
+                # If the hotword inactivity timeout has not been reached, skip
+                if (now - self._last_speech_event_at) < timedelta(
+                    seconds=hotword_inactivity_timeout
+                ):
+                    continue
+
+                logger.info("Inactivity detected. Waiting for hotword.")
+
+                # Set the detection mode to hotword
+                self._speech_detector.set_detection_mode(
+                    SpeechDetector.DetectionMode.HOTWORD
+                )
+
+                # Call the speech callback to indicate waiting for hotword
+                safe_callback_call(event=WaitingForHotwordEvent())
+                user_input = ""
 
                 continue
 
-            if not isinstance(event, (SpeechStartedEvent, PartialSpeechEndedEvent, SpeechEndedEvent)):
-                logging.debug(f'Speech event: {event}')
+            if not isinstance(
+                event,
+                (
+                    SpeechStartedEvent,
+                    PartialSpeechEndedEvent,
+                    SpeechEndedEvent,
+                    HotwordDetectedEvent,
+                    WaitingForHotwordEvent,
+                ),
+            ):
+                logger.debug(f"Speech event: {event}")
                 continue
+
+            if isinstance(event, WaitingForHotwordEvent):
+                logger.info("Waiting for hotword.")
+
+                # Call the speech callback to indicate waiting for hotword
+                safe_callback_call(event=event)
+                user_input = ""
+
+            if isinstance(event, HotwordDetectedEvent):
+                logger.info("Hotword detected.")
+
+                # self._speech_detector.set_detection_mode(SpeechDetector.DetectionMode.VOICE_ACTIVITY)
+
+                # Call the speech callback to indicate hotword detected
+                safe_callback_call(event=event)
 
             if isinstance(event, SpeechStartedEvent):
-                logging.info("Speech detected. Stopping TTS stream.")
+                logger.info("Speech detected. Stopping TTS stream.")
                 self.stop_speaking()
+
                 safe_callback_call(event=event)
 
             if isinstance(event, (PartialSpeechEndedEvent, SpeechEndedEvent)):
@@ -147,25 +186,24 @@ class VoiceUI:
                 safe_callback_call(event=event)
 
                 # Update the user role name
-                audio_data = event.get('audio_data')
+                audio_data = event.get("audio_data")
                 if audio_data is None:
-                    logging.error(f'No audio data for event {event}')
+                    logger.error(f"No audio data for event {event}")
                     continue
 
-                metadata = event.get('metadata')
-                speaker = ((metadata and metadata['speaker']) or {}).get('name', 'user')
+                metadata = event.get("metadata")
+                speaker = ((metadata and metadata["speaker"]) or {}).get("name", "user")
 
                 if self._audio_transcriber is not None:
                     try:
                         # Convert speech to text
                         response = self._audio_transcriber.transcribe(
-                            audio_data=audio_data,
-                            prompt=user_input
+                            audio_data=audio_data, prompt=user_input
                         )
-                        user_input += (' ' + response)
+                        user_input += " " + response
                         user_input = user_input.strip()
                     except Exception as e:
-                        logging.error(f'Error transcribing audio: {e}')
+                        logger.error(f"Error transcribing audio: {e}")
                         continue
 
                     # Call the speech callback
@@ -186,9 +224,9 @@ class VoiceUI:
                                 speech_id=event.id,
                             )
                         )
-                        user_input = ''
+                        user_input = ""
 
-                    logging.info(f'Utterance: "{user_input}"')
+                    logger.info(f'Utterance: "{user_input}"')
 
     def start(self):
         if not self._terminated:
@@ -196,10 +234,18 @@ class VoiceUI:
 
         self._terminated = False
 
-        self._tts_thread = threading.Thread(target=self._text_to_speech_thread_function, daemon=True)
+        self._tts_thread = threading.Thread(
+            target=self._text_to_speech_thread_function,
+            daemon=True,
+            name="TextToSpeechThread",
+        )
         self._tts_thread.start()
 
-        self._speech_event_handler_thread = threading.Thread(target=self._speech_event_handler, daemon=True)
+        self._speech_event_handler_thread = threading.Thread(
+            target=self._speech_event_handler,
+            daemon=True,
+            name="SpeechEventHandlerThread",
+        )
         self._speech_event_handler_thread.start()
 
         self._speech_detector.start()
@@ -244,20 +290,20 @@ class VoiceUI:
 
                 self._tts_streamer.speak(
                     text=text,
-                    voice=self._config.get('voice_name'),
+                    voice=self._config.voice_name,
                 )
                 self._speaker_queue.task_done()
 
             except queue.Empty:
                 continue
             except Exception as e:
-                logging.error(f'Error while transcribing text: {e}')
+                logger.error(f"Error while transcribing text: {e}")
 
     def speak(self, text: str, wait: bool = False):
         if wait:
             self._tts_streamer.speak(
                 text=text,
-                voice=self._config.get('voice_name'),
+                voice=self._config.voice_name,
             )
             while self._tts_streamer.is_speaking():
                 time.sleep(timedelta(milliseconds=10).total_seconds())
@@ -268,7 +314,7 @@ class VoiceUI:
         return self._speaker_queue.qsize() > 0 or self._tts_streamer.is_speaking()
 
     def stop_speaking(self):
-        logging.debug('Cleaning output speech queue')
+        logger.debug("Cleaning output speech queue")
         self._tts_streamer.stop()
 
         while True:

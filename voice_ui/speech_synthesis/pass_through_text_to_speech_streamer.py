@@ -1,118 +1,99 @@
 import logging
-import queue
-import threading
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 from ..audio_io.audio_data import AudioData
 from ..audio_io.player import Player
+from ..audio_io.queued_player import QueuedAudioPlayer
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
-
-class ByteQueue:
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._sem = threading.Semaphore()
-        self._data = b''
-
-    def put(self, data):
-        with self._lock:
-            self._data += data
-            self._sem.release()
-
-    def get(self, timeout=None) -> bytes:
-        acquired = self._sem.acquire(blocking=True, timeout=timeout)
-        if not acquired:
-            raise TimeoutError()
-
-        with self._lock:
-            audio_data = self._data
-            self._data = b''
-
-        return audio_data
+logger = logging.getLogger(__name__)
 
 
 class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
-    def __init__(self):
-        self._stopped = False
-        self._speaking = False
-        self._lock = threading.Lock()
+    """
+    A pass-through TTS streamer that plays pre-recorded audio data.
 
-        self._terminated = False
-        self._speaker_thread = threading.Thread(
-            target=self._speaker_thread_function,
-            daemon=True
-        )
+    This streamer accepts raw audio data and plays it through the audio system.
+    It delegates all queue and playback management to QueuedAudioPlayer.
+    """
 
-        self._data_queue = queue.Queue()
-        self._player = Player()
+    def __init__(
+        self,
+        player: Optional[Player] = None,
+        queued_player: Optional[QueuedAudioPlayer] = None,
+    ):
+        """
+        Initialize the PassThroughTextToSpeechAudioStreamer.
 
-        self._speaker_thread.start()
+        Args:
+            player: Optional custom Player instance. Used if queued_player is not provided.
+            queued_player: Optional custom QueuedAudioPlayer instance. If None, one will be created.
+        """
+        if queued_player is not None:
+            self._queued_player = queued_player
+        else:
+            self._queued_player = QueuedAudioPlayer(player=player)
 
     def terminate(self):
-        self.stop()
-        self._terminated = True
-        if self._speaker_thread.is_alive():
-            self._speaker_thread.join(timeout=5)
+        """Terminate the player and internal thread."""
+        self._queued_player.terminate()
 
     @staticmethod
     def name():
         return "passthrough"
 
     def __del__(self):
+        """Ensure proper cleanup when the object is destroyed."""
         self.terminate()
 
-    def _speaker_thread_function(self):
-        self._terminated = False
-
-        while not self._terminated:
-            try:
-                audio_data = self._data_queue.get(timeout=1)
-
-                if self.is_stopped():
-                    continue
-
-                # logging.debug(f'Playing {len(audio_data)} bytes of audio data')
-                self._speaking = True
-                self._player.play_data(audio_data)
-                self._speaking = False
-
-            except queue.Empty:
-                continue
-            except Exception as e:
-                self._speaking = False
-                logging.error(f'Error while playing audio: {e}')
+    def speech_queue_size(self) -> int:
+        """Get the number of audio chunks in the queue."""
+        return self._queued_player.queue_size()
 
     def stop(self):
-        with self._lock:
-            self._stopped = True
+        """Stop playback."""
+        self._queued_player.stop()
 
-    def is_stopped(self):
-        with self._lock:
-            return self._stopped
+    def resume(self):
+        """Resume playback."""
+        self._queued_player.resume()
 
-    def is_speaking(self):
-        return self._speaking
+    def is_stopped(self) -> bool:
+        """Check if playback is stopped."""
+        return self._queued_player.is_stopped()
+
+    def is_speaking(self) -> bool:
+        """Check if audio is currently being played."""
+        return self._queued_player.is_speaking()
 
     def available_voices(self) -> List[Dict]:
+        """This streamer does not support voice selection."""
         return None
 
     def speak(
         self,
-        text: Union[AudioData, bytes],
+        data: Union[AudioData, bytes],
         **kwargs,
     ):
-        if isinstance(text, str):
+        """
+        Play audio data.
+
+        Args:
+            text: AudioData object or raw audio bytes to play.
+            **kwargs: Additional arguments (unused).
+
+        Raises:
+            AttributeError: If text is a string (this streamer does not support text).
+        """
+        if isinstance(data, str):
             raise AttributeError("This stream does not support text")
 
-        # Reset the stopped flag
-        with self._lock:
-            self._stopped = False
+        # Resume playback if it was stopped
+        self.resume()
 
-        if isinstance(text, AudioData):
-            audio_data = text.content
+        if isinstance(data, AudioData):
+            audio_data = data.content
         else:
-            audio_data = text
+            audio_data = data
 
-        logging.debug(f'Speaking {len(audio_data)} bytes of audio')
-
-        self._data_queue.put(audio_data)
+        self._queued_player.queue_audio(audio_data)

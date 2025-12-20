@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 from typing import Dict, List
 
 
-class TextToSpeechAudioStreamer(ABC):
-    @abstractstaticmethod
+class TextToSpeechAudioStreamer(ABC):  # pragma: no cover
+    @staticmethod
+    @abstractmethod
     def name(self):
         pass
 
@@ -25,6 +26,10 @@ class TextToSpeechAudioStreamer(ABC):
 
     @abstractmethod
     def available_voices(self) -> List[Dict]:
+        pass
+
+    @abstractmethod
+    def speech_queue_size(self) -> int:
         pass
 
     @abstractmethod

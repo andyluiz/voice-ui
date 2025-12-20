@@ -1,11 +1,12 @@
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 
 from ..audio_io.audio_data import AudioData
 
 
-class SpeechToTextTranscriber(ABC):
+class SpeechToTextTranscriber(ABC):  # pragma: no cover
 
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def name() -> str:
         pass
 

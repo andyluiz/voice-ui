@@ -4,11 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "voice-ui"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
   "colorama",
-  "openai",
-  "pvcobra",
   "pveagle",
   "pvporcupine",
   "pvrecorder",
@@ -16,8 +14,6 @@ dependencies = [
   "python-dotenv",
   "requests",
   "six",
-  "google-cloud-speech",
-  "google-cloud-texttospeech",
   "sox",
   "pydub",
 ]
@@ -40,6 +36,29 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+openai = [
+  "openai",
+]
+google = [
+  "google-cloud-speech",
+  "google-cloud-texttospeech",
+]
+local-whisper = [
+  "whisper_timestamped",
+]
+silero = [
+  "silero-vad",
+  "torch>=1.12.0",
+  "torchaudio>=0.12.0",
+]
+pvcobra = [
+  "pvcobra",
+]
+funasr = [
+  "funasr",
+  "torch>=1.13",
+  "torchaudio",
+]
 test = [
   "coverage",
 ]
@@ -48,3 +67,6 @@ dev = [
   "flake8",
   "isort",
 ]
+
+[tool.black]
+preview = false

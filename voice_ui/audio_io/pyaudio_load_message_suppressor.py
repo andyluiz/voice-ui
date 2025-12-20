@@ -19,10 +19,10 @@ c_error_handler_2 = ERROR_HANDLER_FUNC_2(py_error_handler_2)
 
 @contextmanager
 def no_alsa_and_jack_errors():  # pragma: no cover
-    asound = cdll.LoadLibrary('libasound.so')
+    asound = cdll.LoadLibrary("libasound.so")
     asound.snd_lib_error_set_handler(c_error_handler_1)
 
-    jack = cdll.LoadLibrary('libjack.so')
+    jack = cdll.LoadLibrary("libjack.so")
     jack.jack_set_error_function(c_error_handler_2)
 
     yield

@@ -8,16 +8,21 @@ COVERAGE = $(VENV)/bin/coverage
 # A utility function similar to wildcard but that can search recursively
 rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-SRCS=$(call rwildcard,tests,*.py)
+SRCS=$(call rwildcard,voice_ui,*.py) $(call rwildcard,tools,*.py) $(call rwildcard,tests,*.py)
 
 all: checks tests
 
-checks: flake8
+checks: black flake8
 
 venv:
 	python -m venv --upgrade $(VENV)
 	$(VENV)/bin/pip install --upgrade pip
 	$(VENV)/bin/pip install -r requirements.txt
+
+.PHONY: black
+black:
+	@echo Running black
+	$(VENV)/bin/black --check --exclude .venv .
 
 .PHONY: flake8
 flake8:
@@ -29,7 +34,7 @@ tests:
 	@echo Running tests
 	$(COVERAGE) erase
 	$(COVERAGE) run -m unittest discover -v
-	$(COVERAGE) report --omit='tests/*.py' -m -i --fail-under=75
+	$(COVERAGE) report --omit='tests/*.py' -m -i --fail-under=90
 	$(COVERAGE) html -i
 
 .PHONY: online_tests
@@ -45,14 +50,14 @@ TEST_FILE :=
 test:
 	@echo Running tests
 	$(COVERAGE) run --omit='tests/*.py' -m unittest -v $(subst /,.,$(basename $(TEST_FILE)))
-	$(COVERAGE) report -m -i --fail-under=75
+	$(COVERAGE) report -m -i --fail-under=90
 
 .PHONY: compile
 compile:
 	$(PYTHON) -m py_compile $(SRCS)
 
 clean:
-	find ./voice_ui ./examples ./tests -type d -name '__pycache__' -exec rm -rf {} \;
+	find ./voice_ui ./examples ./tests ./tools -type d -name '__pycache__' -exec rm -rf {} \;
 	rm -rf docs/doxygen
 	rm -rf htmlcov .coverage
 

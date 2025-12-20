@@ -21,7 +21,7 @@ class MockAudioStream:
         pass
 
     def generator(self):
-        yield b'audio_data'
+        yield b"audio_data"
 
 
 def mock_SpeechClient_init(*args, **kwargs):
@@ -34,16 +34,16 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
         self.mock_stream = MagicMock(
             _rate=16000,
             _channels=1,
-            generator=MagicMock(return_value=['audio_data']),
+            generator=MagicMock(return_value=["audio_data"]),
         )
 
-    @patch.object(SpeechClient, '__init__', mock_SpeechClient_init)
-    @patch('google.cloud.speech_v2.types.cloud_speech.StreamingRecognizeRequest')
-    @patch('google.cloud.speech_v2.types.cloud_speech.StreamingRecognitionConfig')
-    @patch('google.cloud.speech_v2.types.cloud_speech.StreamingRecognitionFeatures')
-    @patch('google.cloud.speech_v2.types.cloud_speech.RecognitionConfig')
-    @patch('google.cloud.speech_v2.types.cloud_speech.RecognitionFeatures')
-    @patch('google.cloud.speech_v2.SpeechClient.streaming_recognize')
+    @patch.object(SpeechClient, "__init__", mock_SpeechClient_init)
+    @patch("google.cloud.speech_v2.types.cloud_speech.StreamingRecognizeRequest")
+    @patch("google.cloud.speech_v2.types.cloud_speech.StreamingRecognitionConfig")
+    @patch("google.cloud.speech_v2.types.cloud_speech.StreamingRecognitionFeatures")
+    @patch("google.cloud.speech_v2.types.cloud_speech.RecognitionConfig")
+    @patch("google.cloud.speech_v2.types.cloud_speech.RecognitionFeatures")
+    @patch("google.cloud.speech_v2.SpeechClient.streaming_recognize")
     def test_google_speech_v2_recognize(
         self,
         mock_streaming_recognize,
@@ -51,7 +51,7 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
         mock_RecognitionConfig,
         mock_StreamingRecognitionFeatures,
         mock_StreamingRecognitionConfig,
-        mock_StreamingRecognizeRequest
+        mock_StreamingRecognizeRequest,
     ):
         mock_RecognitionFeatures.return_value = MagicMock()
         mock_RecognitionConfig.return_value = MagicMock()
@@ -64,33 +64,31 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
                 MagicMock(
                     is_final=True,
                     alternatives=[
-                        MagicMock(transcript='test_transcript', confidence=0.9)
+                        MagicMock(transcript="test_transcript", confidence=0.9)
                     ],
-                    language_code='en-US'
+                    language_code="en-US",
                 )
             ],
             metadata=MagicMock(total_billed_duration=MagicMock(seconds=10)),
         )
 
-        mock_streaming_recognize.return_value = [
-            mock_response
-        ]
+        mock_streaming_recognize.return_value = [mock_response]
 
         result = sr.google_speech_v2_recognize(
             stream=self.mock_stream,
-            project_id='my_project_id',
-            language_codes=['en-US'],
-            prefix='',
+            project_id="my_project_id",
+            language_codes=["en-US"],
+            prefix="",
             speech_start_timeout=10,
             speech_end_timeout=5,
-            recognition_model='long'
+            recognition_model="long",
         )
 
         expected_result = {
-            'text': 'test_transcript',
+            "text": "test_transcript",
             # 'confidence': 0.9,
-            'language_code': 'en-US',
-            'total_billed_time': 10,
+            "language_code": "en-US",
+            "total_billed_time": 10,
         }
 
         mock_RecognitionFeatures.assert_called_once_with(
@@ -104,8 +102,8 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
                 audio_channel_count=self.mock_stream._channels,
             ),
             features=mock_RecognitionFeatures.return_value,
-            language_codes=['en-US'],
-            model='long',
+            language_codes=["en-US"],
+            model="long",
         )
         mock_StreamingRecognitionFeatures.assert_called_once_with(
             interim_results=True,
@@ -121,7 +119,7 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
         )
         mock_StreamingRecognizeRequest.assert_called_once_with(
             recognizer="projects/my_project_id/locations/global/recognizers/_",
-            streaming_config=mock_StreamingRecognitionConfig.return_value
+            streaming_config=mock_StreamingRecognitionConfig.return_value,
         )
 
         self.mock_stream.resume.assert_called_once()
@@ -129,16 +127,23 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
         self.mock_stream.pause.assert_called_once()
         self.assertEqual(result, expected_result)
 
-    @patch.object(SpeechClient, '__init__', mock_SpeechClient_init)
-    @patch('os.environ', {'GOOGLE_PROJECT_ID': 'test_project_id'})
-    @patch('google.cloud.speech_v2.SpeechClient.streaming_recognize')
+    @patch.object(SpeechClient, "__init__", mock_SpeechClient_init)
+    @patch("os.environ", {"GOOGLE_PROJECT_ID": "test_project_id"})
+    @patch("google.cloud.speech_v2.SpeechClient.streaming_recognize")
     def test_google_speech_v2_recognize_no_return(self, mock_streaming_recognize):
         mock_streaming_recognize.return_value = [
             MagicMock(results=None),
             MagicMock(results=[]),
             MagicMock(results=[MagicMock(alternatives=None)]),
             MagicMock(results=[MagicMock(alternatives=[])]),
-            MagicMock(results=[MagicMock(is_final=False, alternatives=[MagicMock(transcript='not stable')])]),
+            MagicMock(
+                results=[
+                    MagicMock(
+                        is_final=False,
+                        alternatives=[MagicMock(transcript="not stable")],
+                    )
+                ]
+            ),
         ]
 
         result = sr.google_speech_v2_recognize(
@@ -151,8 +156,8 @@ class TestGoogleSpeechV2Recognize(unittest.TestCase):
 
 
 class ListenTestCase(unittest.TestCase):
-    @patch('os.environ', {'GOOGLE_PROJECT_ID': 'TEST_ID'})
-    @patch('voice_ui.alternatives.google_speech_recognition.google_speech_v2_recognize')
+    @patch("os.environ", {"GOOGLE_PROJECT_ID": "TEST_ID"})
+    @patch("voice_ui.alternatives.google_speech_recognition.google_speech_v2_recognize")
     def test_listen_with_language_code(self, mock_google_speech_v2_recognize):
         stream = MockAudioStream()
         language_codes = ["en-US"]
@@ -162,14 +167,16 @@ class ListenTestCase(unittest.TestCase):
 
         # Assert that google_speech_v2_recognize was called with the correct arguments
         mock_google_speech_v2_recognize.assert_called_once_with(
-            project_id='TEST_ID',
+            project_id="TEST_ID",
             stream=stream,
             language_codes=language_codes,
         )
 
-    @patch('os.environ', {'GOOGLE_PROJECT_ID': 'TEST_ID'})
-    @patch('voice_ui.alternatives.google_speech_recognition.google_speech_v2_recognize')
-    def test_listen_with_alternative_language_codes(self, mock_google_speech_v2_recognize):
+    @patch("os.environ", {"GOOGLE_PROJECT_ID": "TEST_ID"})
+    @patch("voice_ui.alternatives.google_speech_recognition.google_speech_v2_recognize")
+    def test_listen_with_alternative_language_codes(
+        self, mock_google_speech_v2_recognize
+    ):
         stream = MockAudioStream()
         language_codes = ["fr-FR", "es-ES"]
 
@@ -177,9 +184,9 @@ class ListenTestCase(unittest.TestCase):
         sr.listen(stream, language_codes=language_codes)
 
         # Assert that google_speech_v2_recognize was called with the correct arguments
-        expected_language_codes = list(set(language_codes + ['en-US']))
+        expected_language_codes = list(set(language_codes + ["en-US"]))
         mock_google_speech_v2_recognize.assert_called_once_with(
-            project_id='TEST_ID',
+            project_id="TEST_ID",
             stream=stream,
             language_codes=expected_language_codes,
         )
@@ -187,13 +194,13 @@ class ListenTestCase(unittest.TestCase):
 
 class TestTranscribeFile(unittest.TestCase):
 
-    @patch.object(speech.SpeechClient, '__init__', mock_SpeechClient_init)
-    @patch('sox.Transformer')
-    @patch('google.cloud.speech_v1.SpeechClient.recognize')
+    @patch.object(speech.SpeechClient, "__init__", mock_SpeechClient_init)
+    @patch("sox.Transformer")
+    @patch("google.cloud.speech_v1.SpeechClient.recognize")
     def test_transcribe_file(self, mock_SpeechClient, mock_Transformer):
         # Create a mock transformer object
         mock_content = MagicMock()
-        mock_content.tobytes.return_value = b'audio_data'
+        mock_content.tobytes.return_value = b"audio_data"
 
         mock_transformer = MagicMock()
         mock_transformer.build_array.return_value = mock_content
@@ -201,20 +208,20 @@ class TestTranscribeFile(unittest.TestCase):
 
         # Mock RecognitionResponse
         mock_result = MagicMock()
-        mock_result.alternatives = [MagicMock(transcript='test_transcript')]
+        mock_result.alternatives = [MagicMock(transcript="test_transcript")]
 
         mock_response = MagicMock()
         mock_response.results = [mock_result]
         mock_SpeechClient.return_value = mock_response
 
-        result = sr.transcribe_file(speech_file='test_speech_file')
+        result = sr.transcribe_file(speech_file="test_speech_file")
 
-        expected_result = 'test_transcript'
+        expected_result = "test_transcript"
 
         mock_SpeechClient.assert_called_once()
 
         self.assertEqual(result, expected_result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -95,7 +95,7 @@ class MicrophoneStream(object):
             # Yield a slice of the data from index 'i' up to but not including 'i + byte_limit'.
             # This will return control back to the caller of this function, allowing it to process
             # the yielded bytes before resuming this function for the next iteration.
-            yield data[i:(i + byte_limit)]
+            yield data[i : (i + byte_limit)]
 
     def generator(self):
         # Keep running this loop until the stream is closed

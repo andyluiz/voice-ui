@@ -3,6 +3,8 @@ import logging
 from . import player
 from .microphone import no_alsa_and_jack_errors
 
+logger = logging.getLogger(__name__)
+
 
 def wait_for_hotword(
     # detected_callback,
@@ -11,14 +13,14 @@ def wait_for_hotword(
     audio_gain=1,
     apply_frontend=True,
     interrupt_check=lambda: False,
-    **kwargs
+    **kwargs,
 ):
     from snowboy import snowboydecoder
 
-    logging.info('Waiting for hotword')
+    logger.info("Waiting for hotword")
 
     # Play the OK file
-    player.play_file('src/resources/sounds/voiceinput3.wav')
+    player.play_file("src/resources/sounds/voiceinput3.wav")
 
     detected = False
 
@@ -38,15 +40,15 @@ def wait_for_hotword(
         detector.start(
             detected_callback=detected_callback,
             interrupt_check=interrupt_check,
-            **kwargs
+            **kwargs,
         )
 
     if detected:
-        logging.info('Hotword was detected')
+        logger.info("Hotword was detected")
 
         # Play the voice input started
-        player.play_file('src/resources/sounds/voiceinput4.wav')
+        player.play_file("src/resources/sounds/voiceinput4.wav")
     else:
-        logging.info('Hotword not detected')
+        logger.info("Hotword not detected")
 
     return detected

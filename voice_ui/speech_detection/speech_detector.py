@@ -1,23 +1,24 @@
 import logging
-import queue
 import threading
 from abc import ABC
-from collections import deque
+from enum import Enum, auto, unique
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Optional
 from uuid import UUID, uuid4
-
-import pveagle
 
 from ..audio_io.audio_data import AudioData
 from .speaker_profile_manager import SpeakerProfileManager
 from .vad_microphone import MicrophoneVADStream
 
+logger = logging.getLogger(__name__)
+
 
 class SpeechEvent(ABC):
     def __init__(self, **kwargs):
         if self.__class__ == SpeechEvent:
-            raise TypeError('SpeechEvent is an abstract class and cannot be instantiated directly')
+            raise TypeError(
+                "SpeechEvent is an abstract class and cannot be instantiated directly"
+            )
 
         self._id = uuid4()
 
@@ -25,7 +26,9 @@ class SpeechEvent(ABC):
             if not hasattr(self, k):
                 setattr(self, k, v)
             else:
-                raise AttributeError(f'{self.__class__.__name__} already has attribute {k}')
+                raise AttributeError(
+                    f"{self.__class__.__name__} already has attribute {k}"
+                )
 
     @property
     def name(self) -> str:
@@ -38,10 +41,10 @@ class SpeechEvent(ABC):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return False
-        return (self.__dict__ == other.__dict__)
+        return self.__dict__ == other.__dict__
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.__dict__})'
+        return f"{self.__class__.__name__}({self.__dict__})"
 
     def get(self, key: str, default=None):
         return self.__dict__.get(key, default)
@@ -74,304 +77,305 @@ class SpeechEndedEvent(SpeechEvent):
     pass
 
 
-class SpeechDetector(MicrophoneVADStream):
+class WaitingForHotwordEvent(SpeechEvent):
+    pass
+
+
+class HotwordDetectedEvent(SpeechEvent):
+    pass
+
+
+class SpeechDetector:
+    @unique
+    class DetectionMode(Enum):
+        HOTWORD = auto()
+        VOICE_ACTIVITY = auto()
+
     def __init__(
         self,
-        callback: Callable[[SpeechEvent], None],
-        speaker_profiles_dir: Path = None,
-        threshold: float = 0.2,
-        pre_speech_duration: float = 0.1,
-        post_speech_duration: float = 1.5,
-        max_speech_duration: float = 10,
+        on_speech_event: Callable[[SpeechEvent], None],
+        speaker_profiles_dir: Optional[Path] = None,
+        threshold: Optional[float] = None,
+        pre_speech_duration: Optional[
+            float
+        ] = None,  # Duration in seconds before speech is considered to have started
+        post_speech_duration: Optional[
+            float
+        ] = None,  # Duration in seconds after speech is considered to have ended
+        max_speech_duration: Optional[
+            float
+        ] = None,  # Maximum duration in seconds of speech to be considered
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        """
+        Initialize a SpeechDetector instance.
 
-        self._thread_args = {
-            "callback": callback,
-            "threshold": threshold,
-            "pre_speech_duration": pre_speech_duration,
-            "post_speech_duration": post_speech_duration,
-            "max_speech_duration": max_speech_duration,
-        }
+        The SpeechDetector coordinates voice activity detection (VAD) with optional hotword detection
+        and speaker profiling to identify speech events in audio streams.
+
+        Args:
+            on_speech_event: Callback function invoked when speech events occur. Receives a SpeechEvent
+                instance (e.g., SpeechStartedEvent, SpeechEndedEvent, HotwordDetectedEvent).
+                **Important**: This callback is invoked by the internal speech processing thread and must
+                not block for extended periods, as doing so may cause event delays or missed detections.
+            speaker_profiles_dir: Optional path to a directory containing speaker profile files for
+                speaker identification. If provided, speaker detection will be enabled during speech.
+                Defaults to None (speaker detection disabled).
+            threshold: Optional VAD sensitivity threshold. Passed to MicrophoneVADStream.
+                Defaults to None (uses VAD engine defaults).
+            pre_speech_duration: Optional duration in seconds of audio to prepend to detected speech.
+                Helps capture speech that begins just before VAD triggers. Defaults to None.
+            post_speech_duration: Optional duration in seconds of silence to append after detected speech.
+                Helps capture trailing speech before silence is detected. Defaults to None.
+            max_speech_duration: Maximum duration in seconds for a single continuous speech segment.
+                If exceeded, a PartialSpeechEndedEvent is emitted and collection resets. Defaults to 10 seconds.
+            **kwargs: Additional arguments passed to MicrophoneVADStream (e.g., vad_engine, hotword_engine).
+
+        Raises:
+            ValueError: Raised in _run() if on_speech_event callback is None when the detector starts.
+        """
+        # Set defaults
+        if max_speech_duration is None:
+            max_speech_duration = 10
+
+        self._source_stream = MicrophoneVADStream(
+            threshold=threshold,
+            pre_speech_duration=pre_speech_duration,
+            post_speech_duration=post_speech_duration,
+            **kwargs,
+        )
+
+        self._on_speech_event = on_speech_event
+        self._max_speech_duration = max_speech_duration
 
         self._speaker_profiles_dir = speaker_profiles_dir
-        self._speaker_profiles = []
-        self._eagle_recognizer = None
-
-    def stop(self):
-        self.pause()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
-            self._thread = None
-
-        if self._eagle_recognizer is not None:
-            self._eagle_recognizer.delete()
-            self._eagle_recognizer = None
+        self._profile_manager = (
+            SpeakerProfileManager(self._speaker_profiles_dir)
+            if self._speaker_profiles_dir
+            else None
+        )
+        self._thread = None
 
     def start(self):
-        self._speaker_profiles = []
-        if self._speaker_profiles_dir:
-            logging.info(f'Loading speaker profiles from {self._speaker_profiles_dir}')
-            self._speaker_profiles = SpeakerProfileManager(self._speaker_profiles_dir).load_profiles()
-            logging.info(f'Loaded {len(self._speaker_profiles)} speaker profiles')
-
-        if self._eagle_recognizer is not None:
-            self._eagle_recognizer.delete()
-            self._eagle_recognizer = None
-
-        if self._speaker_profiles:
-            self._eagle_recognizer = pveagle.create_recognizer(
-                access_key=self._pv_access_key,
-                speaker_profiles=list(map(lambda x: x["profile_data"], self._speaker_profiles))
-            )
-            assert self._eagle_recognizer.frame_length == self._cobra.frame_length, "Frame length mismatch"
+        if self._profile_manager:
+            self._profile_manager.load_profiles()
 
         self._thread = threading.Thread(
-            target=self._run,
-            kwargs=self._thread_args,
-            daemon=True,
+            target=self._run, daemon=True, name="SpeechDetectorThread"
         )
         self._thread.start()
 
-    def _run(
-        self,
-        callback: Callable[[SpeechEvent], None] = None,
-        threshold: float = None,
-        pre_speech_duration: float = 0.1,
-        post_speech_duration: float = 1.0,
-        max_speech_duration: float = 10,
-    ):
-        if callback is None:
+    def stop(self):
+        self._source_stream.pause()
+
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
+
+        self._profile_manager = None
+
+    @property
+    def detection_mode(self):
+        mapping = {
+            MicrophoneVADStream.DetectionMode.HOTWORD: SpeechDetector.DetectionMode.HOTWORD,
+            MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY: SpeechDetector.DetectionMode.VOICE_ACTIVITY,
+        }
+        return mapping[self._source_stream.detection_mode]
+
+    def set_detection_mode(self, mode: DetectionMode):
+        mapping = {
+            SpeechDetector.DetectionMode.HOTWORD: MicrophoneVADStream.DetectionMode.HOTWORD,
+            SpeechDetector.DetectionMode.VOICE_ACTIVITY: MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY,
+        }
+        self._source_stream.set_detection_mode(mapping[mode])
+
+    def _run(self):
+        logger.debug("Speech detector thread started")
+
+        if self._on_speech_event is None:
             raise ValueError("Callback is required")
 
-        # Set threshold to a default value if not provided
-        if threshold is None:
-            threshold = self._threshold
-
         # Calculate chunk durations
-        start_chunks, end_chunks, max_chunks = map(
-            self._convert_duration_to_chunks,
-            [pre_speech_duration, post_speech_duration, max_speech_duration],
+        max_chunks = self._source_stream.convert_duration_to_chunks(
+            self._max_speech_duration
         )
-
-        logging.debug(f"Start chunks: {start_chunks}")
-        logging.debug(f"End chunks: {end_chunks}")
-        logging.debug(f"Max chunks: {max_chunks}")
+        logger.debug(f"Max chunks: {max_chunks}")
 
         # Initialize counters and flags
-        self.threshold_counter = deque(maxlen=start_chunks)
-        self.above_threshold_counter = 0
-        self.below_threshold_counter = 0
-        self.speech_detected = False
         self.collected_chunks = []
-        self.speaker_scores = [0] * len(self._speaker_profiles)
+        self.speaker_scores = []
 
         # Resume audio stream
-        self.resume()
+        self._source_stream.resume()
 
         # Main loop to process audio chunks
         try:
-            while not self._closed:
-                try:
-                    # Process the next audio chunk
-                    self._process_next_chunk(
-                        callback,
-                        threshold,
-                        start_chunks,
-                        end_chunks,
-                        max_chunks,
+            speech_detected = False
+            waiting_for_hotword = False
+
+            for chunk in self._source_stream.generator():
+                if len(chunk) == 0:
+                    speech_detected = False
+                    self._handle_speech_end()
+
+                    waiting_for_hotword = (
+                        self._source_stream.detection_mode
+                        == MicrophoneVADStream.DetectionMode.HOTWORD
                     )
-                except queue.Empty:
+                    if waiting_for_hotword:
+                        self._handle_hotword_waiting()
+
                     continue
+
+                # Detect speaker
+                if self._profile_manager:
+                    audio_frame = self._source_stream.convert_data(chunk)
+
+                    scores = self._profile_manager.detect_speaker(audio_frame)
+                    if scores:
+                        self.speaker_scores.append(scores)
+                        logger.debug(
+                            f"Scores: {scores}, speaker ID: {self._profile_manager.get_speaker_name(scores)}"
+                        )
+
+                # Check if we're waiting for a hotword
+                if waiting_for_hotword:
+                    self._handle_hotword_detection()
+                    waiting_for_hotword = False
+
+                # Detect start of speech
+                if not speech_detected:
+                    speech_detected = True
+                    self._handle_speech_start()
+
+                # Collect chunks during speech detection
+                self.collected_chunks.append(chunk)
+
+                # Handle case where collected chunks exceed max duration
+                self._handle_collected_chunks_overflow(max_chunks)
+
+            # Handle case where stream was closed before end of the speech
+            if speech_detected:
+                self._handle_speech_end()
+
         finally:
             # Pause audio processing when closed
-            self.pause()
+            self._source_stream.pause()
 
-            del self.above_threshold_counter
-            del self.below_threshold_counter
-            del self.speech_detected
             del self.collected_chunks
 
-    def _process_next_chunk(
-        self,
-        callback,
-        threshold,
-        start_chunks,
-        end_chunks,
-        max_chunks,
-    ):
+        logger.debug("Speech detector thread finished")
+
+    def _handle_hotword_waiting(self):
         """
-        Process the next audio chunk from the buffer.
+        Handle hotword waiting.
         """
-        # Get the next audio chunk from buffer
-        chunk = self._get_chunk_from_buffer()
-        if chunk is None:
-            raise RuntimeError("Chunk is none")
+        logger.debug("Waiting for hotword")
 
-        # Convert raw data chunk to audio frame
-        audio_frame = self._convert_data(chunk)
+        self._on_speech_event(
+            event=WaitingForHotwordEvent(
+                hotwords=self._source_stream.available_keywords,
+            )
+        )
 
-        # Determine the probability of voice in the audio frame
-        voice_probability = self._cobra.process(audio_frame)
+    def _handle_hotword_detection(self):
+        """
+        Handle hotword detection.
+        """
+        logger.debug("Hotword detected")
 
-        self.threshold_counter.append(voice_probability)
+        # Find the speaker
+        speaker_info = None
+        if self._profile_manager:
+            # # Calculate the average scores for each speaker
+            # scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+            # Calculate the total scores for each speaker
+            scores = [sum(score) for score in zip(*self.speaker_scores)]
 
-        acc_voice_probability = sum(self.threshold_counter) / len(self.threshold_counter)
-        # logging.debug(
-        #     "Voice Probability: {:.2f}%, threshold: {:.2f}%".format(acc_voice_probability, threshold)
-        # )
+            # Get the speaker with the highest score
+            speaker_info = self._profile_manager.get_speaker_name(scores)
+            logger.debug(f"Speaker is {speaker_info} with scores {scores}")
 
-        if acc_voice_probability > threshold:
-            # Increment counter for chunks above threshold
-            self.above_threshold_counter += 1
-            self.below_threshold_counter = 0
-            # logging.debug(
-            #     "Voice Probability: {:.2f}%, above_threshold_counter: {}".format(
-            #         voice_probability, self.above_threshold_counter
-            #     )
-            # )
-        else:
-            # Increment counter for chunks below threshold
-            self.below_threshold_counter += 1
-            self.above_threshold_counter = 0
-            # logging.debug(
-            #     "Voice Probability: {:.2f}%, below_threshold_counter: {}".format(
-            #         voice_probability, self.below_threshold_counter
-            #     )
-            # )
+        self._on_speech_event(
+            event=HotwordDetectedEvent(
+                hotword_detected=self._source_stream.last_hotword_detected,
+                speaker=speaker_info,
+            )
+        )
 
-        # Detect start of speech
-        if not self.speech_detected and self.above_threshold_counter >= start_chunks:
-            self.speech_detected = True
-            self._handle_speech_start(callback)
-
-        # Detect end of speech
-        if self.speech_detected and self.below_threshold_counter >= end_chunks:
-            self.speech_detected = False
-            self._handle_speech_end(callback)
-
-        # Report metadata
-        self._handle_metadata_report(callback, voice_probability)
-
-        if self.speech_detected:
-            if self.speaker_scores:
-                scores = self._detect_speaker(audio_frame)
-                self.speaker_scores = list(map(lambda x, y: x + y, self.speaker_scores, scores))
-                logging.debug(f"Speaker ID: {self._get_speaker_name(scores)}")
-
-            # Collect chunks during speech detection
-            self.collected_chunks.append(chunk)
-
-            # Handle case where collected chunks exceed max duration
-            self._handle_collected_chunks_overflow(callback, max_chunks)
-
-    def _get_speaker_name(self, scores: List[float]) -> Optional[Tuple[str, int, float]]:
-        if not scores:
-            return None
-
-        # Find the speaker by returning the index of the with the highest score
-        speaker_id, score = max(enumerate(scores), key=lambda x: x[1])
-        if score < 0.2:
-            return None
-
-        speaker_name = list(map(lambda x: x["name"], self._speaker_profiles))[speaker_id]
-
-        return {
-            "name": speaker_name,
-            "id": speaker_id,
-            "score": score,
-        }
-
-    def _detect_speaker(self, audio_frame) -> Optional[Tuple[str, int, float]]:
-        if self._eagle_recognizer is None:
-            logging.error("Eagle recognizer is not initialized")
-            return None
-
-        scores = self._eagle_recognizer.process(audio_frame)
-        if not scores:
-            logging.debug("No speaker detected")
-            return None
-
-        return scores
-
-    def _handle_speech_start(self, callback):
+    def _handle_speech_start(self):
         """
         Handle the start of speech detection.
         """
-        logging.debug("Speech start detected")
+        logger.debug("Speech start detected")
 
-        callback(event=SpeechStartedEvent())
+        self._on_speech_event(event=SpeechStartedEvent())
 
-        # Add pre-speech chunks to collected chunks
-        self.collected_chunks.extend(self._pre_speech_queue)
-
-    def _handle_speech_end(self, callback):
+    def _handle_speech_end(self):
         """
         Handle the end of speech detection.
         """
-        logging.debug("Speech end detected")
+        logger.debug("Speech end detected")
 
         # Find the speaker
-        speaker_sum = sum(self.speaker_scores)
-        scores = list(map(lambda x: (x / speaker_sum) if speaker_sum > 0 else 0, self.speaker_scores))
-        speaker_info = self._get_speaker_name(scores)
+        speaker_info = None
+        if self._profile_manager:
+            # # Calculate the average scores for each speaker
+            # scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+            # Calculate the total scores for each speaker
+            scores = [sum(score) for score in zip(*self.speaker_scores)]
 
-        callback(
+            # Get the speaker with the highest score
+            speaker_info = self._profile_manager.get_speaker_name(scores)
+            logger.debug(f"Speaker is {speaker_info} with scores {scores}")
+
+        self._on_speech_event(
             event=SpeechEndedEvent(
                 audio_data=AudioData(
-                    channels=self.channels,
-                    sample_size=self.sample_size,
-                    rate=self.rate,
+                    channels=self._source_stream.channels,
+                    sample_size=self._source_stream.sample_size,
+                    rate=self._source_stream.rate,
                     content=b"".join(self.collected_chunks),
                 ),
                 metadata={
                     "speaker": speaker_info,
-                }
-            )
-        )
-        self.collected_chunks.clear()
-        self.speaker_scores = [0] * len(self._speaker_profiles)
-
-    def _handle_metadata_report(self, callback, voice_probability):
-        """
-        Handle the metadata reporting.
-        """
-        callback(
-            event=MetaDataEvent(
-                metadata={
-                    "voice_probability": voice_probability,
-                    "above_threshold_counter": self.above_threshold_counter,
-                    "below_threshold_counter": self.below_threshold_counter,
                 },
             )
         )
+        self.collected_chunks.clear()
+        self.speaker_scores.clear()
 
-    def _handle_collected_chunks_overflow(self, callback, max_chunks):
+    def _handle_collected_chunks_overflow(self, max_chunks):
         """
         Handle the case where collected chunks exceed the maximum duration.
         """
         n_collected_chunks = len(self.collected_chunks)
-        if (
-            n_collected_chunks > int(0.8 * max_chunks)
-            and self.below_threshold_counter >= 5  # TODO: Make this configurable
-        ) or n_collected_chunks > int(1.2 * max_chunks):
-            speaker_sum = sum(self.speaker_scores)
-            scores = list(map(lambda x: (x / speaker_sum) if speaker_sum > 0 else 0, self.speaker_scores))
-            speaker_info = self._get_speaker_name(scores)
+        if n_collected_chunks > int(0.8 * max_chunks) or n_collected_chunks > int(
+            1.2 * max_chunks
+        ):
+            # Find the speaker
+            speaker_info = None
+            if self._profile_manager:
+                # # Calculate the average scores for each speaker
+                # scores = [sum(score) / len(score) for score in zip(*self.speaker_scores)]
+                # Calculate the total scores for each speaker
+                scores = [sum(score) for score in zip(*self.speaker_scores)]
 
-            callback(
+                # Get the speaker with the highest score
+                speaker_info = self._profile_manager.get_speaker_name(scores)
+                logger.debug(f"Speaker is {speaker_info} with scores {scores}")
+
+            self._on_speech_event(
                 event=PartialSpeechEndedEvent(
                     audio_data=AudioData(
-                        channels=self.channels,
-                        sample_size=self.sample_size,
-                        rate=self.rate,
+                        channels=self._source_stream.channels,
+                        sample_size=self._source_stream.sample_size,
+                        rate=self._source_stream.rate,
                         content=b"".join(self.collected_chunks),
                     ),
                     metadata={
                         "speaker": speaker_info,
-                    }
+                    },
                 )
             )
             self.collected_chunks.clear()
-            self.speaker_scores = [0] * len(self._speaker_profiles)
+            self.speaker_scores.clear()
