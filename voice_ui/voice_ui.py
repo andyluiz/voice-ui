@@ -283,14 +283,14 @@ class VoiceUI:
     def _text_to_speech_thread_function(self):
         while not self._terminated:
             try:
-                text = self._speaker_queue.get(timeout=1)
+                (text, kwargs) = self._speaker_queue.get(timeout=1)
 
                 # if not self._voice_output_enabled:
                 #     continue
 
                 self._tts_streamer.speak(
-                    text=text,
-                    voice=self._config.voice_name,
+                    text,
+                    **kwargs,
                 )
                 self._speaker_queue.task_done()
 
@@ -299,16 +299,16 @@ class VoiceUI:
             except Exception as e:
                 logger.error(f"Error while transcribing text: {e}")
 
-    def speak(self, text: str, wait: bool = False):
+    def speak(self, text: str, wait: bool = False, **kwargs):
         if wait:
             self._tts_streamer.speak(
-                text=text,
-                voice=self._config.voice_name,
+                text,
+                **kwargs,
             )
             while self._tts_streamer.is_speaking():
                 time.sleep(timedelta(milliseconds=10).total_seconds())
         else:
-            self._speaker_queue.put(text)
+            self._speaker_queue.put((text, kwargs))
 
     def is_speaking(self) -> bool:
         return self._speaker_queue.qsize() > 0 or self._tts_streamer.is_speaking()

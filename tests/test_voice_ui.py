@@ -28,7 +28,6 @@ class TestVoiceUI(unittest.TestCase):
     def setUp(self):
         self.mock_speech_callback = MagicMock()
         self.mock_config = VoiceUIConfig(
-            voice_name="test_voice",
             voice_profiles_dir=Path("/tmp/voice_profiles"),
         )
 
@@ -91,7 +90,6 @@ class TestVoiceUI(unittest.TestCase):
         self.voice_ui._tts_streamer.is_speaking = MagicMock(return_value=False)
         self.voice_ui._terminated = False
         self.voice_ui._config = VoiceUIConfig(
-            voice_name="test_voice",
             voice_profiles_dir=Path("/tmp/voice_profiles"),
             hotword_inactivity_timeout=30,
         )
@@ -228,11 +226,11 @@ class TestVoiceUI(unittest.TestCase):
     @patch("voice_ui.voice_ui.logging.error")
     def test_text_to_speech(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
-        self.voice_ui._config = VoiceUIConfig(voice_name="test_voice")
+        self.voice_ui._config = VoiceUIConfig()
 
         def speaker_queue_get_side_effect(timeout):
             self.voice_ui._terminated = True
-            return "Hello World"
+            return ("Hello World", {})
 
         self.voice_ui._speaker_queue.get = MagicMock(
             side_effect=speaker_queue_get_side_effect
@@ -241,9 +239,7 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._text_to_speech_thread_function()
 
-        self.voice_ui._tts_streamer.speak.assert_called_once_with(
-            text="Hello World", voice="test_voice"
-        )
+        self.voice_ui._tts_streamer.speak.assert_called_once_with("Hello World")
 
         self.voice_ui._speaker_queue.get.assert_called_once()
         self.voice_ui._speaker_queue.task_done.assert_called_once()
@@ -268,7 +264,7 @@ class TestVoiceUI(unittest.TestCase):
     @patch("voice_ui.voice_ui.logger.error")
     def test_text_to_speech_error_happened(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
-        self.voice_ui._config = VoiceUIConfig(voice_name="test_voice")
+        self.voice_ui._config = VoiceUIConfig()
         self.voice_ui._tts_streamer.speak = MagicMock(
             side_effect=Exception("Test exception")
         )
@@ -280,7 +276,7 @@ class TestVoiceUI(unittest.TestCase):
                 self.voice_ui._terminated = True
                 raise Empty
 
-            return inputs.pop(0)
+            return (inputs.pop(0), {})
 
         self.voice_ui._speaker_queue.get = MagicMock(
             side_effect=speaker_queue_get_side_effect
@@ -290,8 +286,8 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._tts_streamer.speak.assert_has_calls(
             [
-                call(text="First pass", voice="test_voice"),
-                call(text="Second pass", voice="test_voice"),
+                call("First pass"),
+                call("Second pass"),
             ]
         )
         self.assertTrue(mock_logging_error.called)
@@ -313,9 +309,7 @@ class TestVoiceUI(unittest.TestCase):
 
         self.assertTrue(self.voice_ui._speaker_queue.empty())
 
-        self.voice_ui._tts_streamer.speak.assert_called_once_with(
-            text=text, voice="test_voice"
-        )
+        self.voice_ui._tts_streamer.speak.assert_called_once_with(text)
         self.assertEqual(self.voice_ui._tts_streamer.is_speaking.call_count, 3)
 
     def test_stop_speaking(self):
