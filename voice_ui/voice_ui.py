@@ -282,22 +282,31 @@ class VoiceUI:
     # Text-to-Speech methods
     def _text_to_speech_thread_function(self):
         while not self._terminated:
+            item = None
             try:
-                (text, kwargs) = self._speaker_queue.get(timeout=1)
+                item = self._speaker_queue.get(timeout=1)
+
+                try:
+                    (text, tts_kwargs) = item
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Invalid queue item for TTS: {item!r}, error: {e}")
+                    continue
 
                 # if not self._voice_output_enabled:
                 #     continue
 
                 self._tts_streamer.speak(
                     text,
-                    **kwargs,
+                    **tts_kwargs,
                 )
-                self._speaker_queue.task_done()
 
             except queue.Empty:
                 continue
             except Exception as e:
                 logger.error(f"Error while transcribing text: {e}")
+            finally:
+                if item is not None:
+                    self._speaker_queue.task_done()
 
     def speak(self, text: str, wait: bool = False, **kwargs):
         if wait:

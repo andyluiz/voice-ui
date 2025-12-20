@@ -281,6 +281,7 @@ class TestVoiceUI(unittest.TestCase):
         self.voice_ui._speaker_queue.get = MagicMock(
             side_effect=speaker_queue_get_side_effect
         )
+        self.voice_ui._speaker_queue.task_done = MagicMock()
 
         self.voice_ui._text_to_speech_thread_function()
 
@@ -291,6 +292,8 @@ class TestVoiceUI(unittest.TestCase):
             ]
         )
         self.assertTrue(mock_logging_error.called)
+
+        self.voice_ui._speaker_queue.task_done.assert_has_calls([call(), call()])
 
     def test_speak(self):
         text = "Hello world"
