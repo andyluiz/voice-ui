@@ -55,10 +55,6 @@ class VoiceUIConfig:
             Supported values: 'openai-tts', 'google', 'passthrough'
             Default: 'openai-tts'
 
-        voice_name: Voice identifier/name for TTS output.
-            Available voices depend on the TTS engine selected.
-            Default: None (uses engine default)
-
         hotword_inactivity_timeout: Seconds of inactivity before automatically
             switching back to hotword detection mode. If None, inactivity timeout
             is disabled.
@@ -74,7 +70,6 @@ class VoiceUIConfig:
     additional_keyword_paths: Dict[str, str] = field(default_factory=dict)
     audio_transcriber: str = "whisper"
     tts_engine: str = "openai-tts"
-    voice_name: Optional[str] = None
     hotword_inactivity_timeout: Optional[float] = None
 
     def __post_init__(self):

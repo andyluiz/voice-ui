@@ -28,7 +28,6 @@ class TestVoiceUI(unittest.TestCase):
     def setUp(self):
         self.mock_speech_callback = MagicMock()
         self.mock_config = VoiceUIConfig(
-            voice_name="test_voice",
             voice_profiles_dir=Path("/tmp/voice_profiles"),
         )
 
@@ -91,7 +90,6 @@ class TestVoiceUI(unittest.TestCase):
         self.voice_ui._tts_streamer.is_speaking = MagicMock(return_value=False)
         self.voice_ui._terminated = False
         self.voice_ui._config = VoiceUIConfig(
-            voice_name="test_voice",
             voice_profiles_dir=Path("/tmp/voice_profiles"),
             hotword_inactivity_timeout=30,
         )
@@ -228,7 +226,31 @@ class TestVoiceUI(unittest.TestCase):
     @patch("voice_ui.voice_ui.logging.error")
     def test_text_to_speech(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
-        self.voice_ui._config = VoiceUIConfig(voice_name="test_voice")
+        self.voice_ui._config = VoiceUIConfig()
+
+        def speaker_queue_get_side_effect(timeout):
+            self.voice_ui._terminated = True
+            return ("Hello World", {})
+
+        self.voice_ui._speaker_queue.get = MagicMock(
+            side_effect=speaker_queue_get_side_effect
+        )
+        self.voice_ui._speaker_queue.task_done = MagicMock()
+
+        self.voice_ui._text_to_speech_thread_function()
+
+        self.voice_ui._tts_streamer.speak.assert_called_once_with("Hello World")
+
+        self.voice_ui._speaker_queue.get.assert_called_once()
+        self.voice_ui._speaker_queue.task_done.assert_called_once()
+        self.assertFalse(mock_logging_error.called)
+
+    @patch.object(Thread, "start")
+    @patch("voice_ui.voice_ui.logger.error")
+    def test_text_to_speech_item_as_string(self, mock_logging_error, mock_thread_start):
+        """Test when item in queue is just a string (not a tuple)."""
+        self.voice_ui._terminated = False
+        self.voice_ui._config = VoiceUIConfig()
 
         def speaker_queue_get_side_effect(timeout):
             self.voice_ui._terminated = True
@@ -241,13 +263,96 @@ class TestVoiceUI(unittest.TestCase):
 
         self.voice_ui._text_to_speech_thread_function()
 
-        self.voice_ui._tts_streamer.speak.assert_called_once_with(
-            text="Hello World", voice="test_voice"
-        )
-
-        self.voice_ui._speaker_queue.get.assert_called_once()
+        self.voice_ui._tts_streamer.speak.assert_called_once_with("Hello World")
         self.voice_ui._speaker_queue.task_done.assert_called_once()
         self.assertFalse(mock_logging_error.called)
+
+    @patch.object(Thread, "start")
+    @patch("voice_ui.voice_ui.logger.error")
+    def test_text_to_speech_item_not_unpackable(
+        self, mock_logging_error, mock_thread_start
+    ):
+        """Test when item cannot be unpacked as a tuple."""
+        self.voice_ui._terminated = False
+        self.voice_ui._config = VoiceUIConfig()
+
+        inputs = [123, "second text"]  # 123 cannot be unpacked
+
+        def speaker_queue_get_side_effect(timeout):
+            if len(inputs) == 0:
+                self.voice_ui._terminated = True
+                raise Empty
+            return inputs.pop(0)
+
+        self.voice_ui._speaker_queue.get = MagicMock(
+            side_effect=speaker_queue_get_side_effect
+        )
+        self.voice_ui._speaker_queue.task_done = MagicMock()
+
+        self.voice_ui._text_to_speech_thread_function()
+
+        # Should log error for invalid item (123) and continue to process "second text"
+        self.assertEqual(mock_logging_error.call_count, 1)
+        self.voice_ui._tts_streamer.speak.assert_called_once_with("second text")
+        # task_done is called for both the invalid item (123) and the valid item ("second text")
+        self.assertEqual(self.voice_ui._speaker_queue.task_done.call_count, 2)
+
+    @patch.object(Thread, "start")
+    @patch("voice_ui.voice_ui.logger.error")
+    def test_text_to_speech_tts_kwargs_none(
+        self, mock_logging_error, mock_thread_start
+    ):
+        """Test when tts_kwargs is None."""
+        self.voice_ui._terminated = False
+        self.voice_ui._config = VoiceUIConfig()
+
+        def speaker_queue_get_side_effect(timeout):
+            self.voice_ui._terminated = True
+            return ("Hello World", None)
+
+        self.voice_ui._speaker_queue.get = MagicMock(
+            side_effect=speaker_queue_get_side_effect
+        )
+        self.voice_ui._speaker_queue.task_done = MagicMock()
+
+        self.voice_ui._text_to_speech_thread_function()
+
+        self.voice_ui._tts_streamer.speak.assert_called_once_with("Hello World")
+        self.voice_ui._speaker_queue.task_done.assert_called_once()
+        self.assertFalse(mock_logging_error.called)
+
+    @patch.object(Thread, "start")
+    @patch("voice_ui.voice_ui.logger.error")
+    def test_text_to_speech_tts_kwargs_not_dict(
+        self, mock_logging_error, mock_thread_start
+    ):
+        """Test when tts_kwargs is not a dictionary."""
+        self.voice_ui._terminated = False
+        self.voice_ui._config = VoiceUIConfig()
+
+        inputs = [
+            ("Hello", "not_a_dict"),  # tts_kwargs is a string
+            "second text",
+        ]
+
+        def speaker_queue_get_side_effect(timeout):
+            if len(inputs) == 0:
+                self.voice_ui._terminated = True
+                raise Empty
+            return inputs.pop(0)
+
+        self.voice_ui._speaker_queue.get = MagicMock(
+            side_effect=speaker_queue_get_side_effect
+        )
+        self.voice_ui._speaker_queue.task_done = MagicMock()
+
+        self.voice_ui._text_to_speech_thread_function()
+
+        # Should log error for invalid tts_kwargs type and continue to process "second text"
+        self.assertEqual(mock_logging_error.call_count, 1)
+        self.voice_ui._tts_streamer.speak.assert_called_once_with("second text")
+        # task_done is called for both the invalid item and the valid item
+        self.assertEqual(self.voice_ui._speaker_queue.task_done.call_count, 2)
 
     @patch.object(Thread, "start")
     @patch("voice_ui.voice_ui.logging.error")
@@ -268,7 +373,7 @@ class TestVoiceUI(unittest.TestCase):
     @patch("voice_ui.voice_ui.logger.error")
     def test_text_to_speech_error_happened(self, mock_logging_error, mock_thread_start):
         self.voice_ui._terminated = False
-        self.voice_ui._config = VoiceUIConfig(voice_name="test_voice")
+        self.voice_ui._config = VoiceUIConfig()
         self.voice_ui._tts_streamer.speak = MagicMock(
             side_effect=Exception("Test exception")
         )
@@ -280,21 +385,24 @@ class TestVoiceUI(unittest.TestCase):
                 self.voice_ui._terminated = True
                 raise Empty
 
-            return inputs.pop(0)
+            return (inputs.pop(0), {})
 
         self.voice_ui._speaker_queue.get = MagicMock(
             side_effect=speaker_queue_get_side_effect
         )
+        self.voice_ui._speaker_queue.task_done = MagicMock()
 
         self.voice_ui._text_to_speech_thread_function()
 
         self.voice_ui._tts_streamer.speak.assert_has_calls(
             [
-                call(text="First pass", voice="test_voice"),
-                call(text="Second pass", voice="test_voice"),
+                call("First pass"),
+                call("Second pass"),
             ]
         )
         self.assertTrue(mock_logging_error.called)
+
+        self.voice_ui._speaker_queue.task_done.assert_has_calls([call(), call()])
 
     def test_speak(self):
         text = "Hello world"
@@ -313,9 +421,7 @@ class TestVoiceUI(unittest.TestCase):
 
         self.assertTrue(self.voice_ui._speaker_queue.empty())
 
-        self.voice_ui._tts_streamer.speak.assert_called_once_with(
-            text=text, voice="test_voice"
-        )
+        self.voice_ui._tts_streamer.speak.assert_called_once_with(text)
         self.assertEqual(self.voice_ui._tts_streamer.is_speaking.call_count, 3)
 
     def test_stop_speaking(self):
