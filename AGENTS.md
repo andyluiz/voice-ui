@@ -82,18 +82,28 @@ full event handling patterns.
 ### 3. Audio Pipeline Architecture
 
 ```plain
-Microphone → AudioData → VAD → SpeechDetector → Transcriber → VoiceUI
-                                       ↓
-                                 HotwordDetector
-                                       ↓
-                              SpeakerProfileManager
+Audio Input → VAD → SpeechDetector → Transcriber → VoiceUI
+    ↓
+  Sources:
+  - MicrophoneStream (device audio)
+  - VirtualMicrophone (programmatic injection)
+  - WebRTCRemoteMicrophone (WebRTC peer)
+    
+Audio Output → Player Sinks:
+  - Player (device playback)
+  - VirtualPlayer (queue-based)
+  - WebRTCRemotePlayer (WebRTC streaming)
 ```
 
 **Core Classes**:
 
 - `AudioData` (`audio_io/audio_data.py`) — immutable audio buffer with metadata
-- `Microphone` (`audio_io/microphone.py`) — captures audio from device
-- `Player` (`audio_io/player.py`) — plays audio output
+- `MicrophoneStream` (`audio_io/microphone.py`) — captures audio from device
+- `VirtualMicrophone` (`audio_io/virtual_microphone.py`) — queue-based audio injection for testing/synthetic sources
+- `WebRTCRemoteMicrophone` (`audio_io/webrtc_remote_microphone.py`) — autonomous WebRTC audio receiver
+- `Player` (`audio_io/player.py`) — plays audio output to device
+- `VirtualPlayer` (`audio_io/virtual_player.py`) — queue-based audio sink for programmatic handling
+- `WebRTCRemotePlayer` (`audio_io/webrtc_remote_player.py`) — sends audio to WebRTC peers
 - `SpeechDetector` (`speech_detection/speech_detector.py`) — orchestrates VAD + hotword + profiling
 - `VoiceUI` (`voice_ui.py`) — high-level orchestrator for full voice interaction
 
@@ -240,9 +250,14 @@ From `TODO.md` and recent commits:
 
 ### Audio I/O
 
-- `voice_ui/audio_io/microphone.py` — Capture
-- `voice_ui/audio_io/player.py` — Playback
-- `voice_ui/audio_io/audio_data.py` — Data structure
+- `voice_ui/audio_io/microphone.py` — Device microphone capture
+- `voice_ui/audio_io/virtual_microphone.py` — Programmatic audio injection
+- `voice_ui/audio_io/webrtc_remote_microphone.py` — WebRTC audio reception
+- `voice_ui/audio_io/player.py` — Device audio playback
+- `voice_ui/audio_io/virtual_player.py` — Queue-based audio sink
+- `voice_ui/audio_io/webrtc_remote_player.py` — WebRTC audio transmission
+- `voice_ui/audio_io/audio_data.py` — Audio data structure
+- `voice_ui/audio_io/webrtc_signaling_server.py` — Generic WebRTC signaling (reusable for send/receive)
 
 ### Examples
 

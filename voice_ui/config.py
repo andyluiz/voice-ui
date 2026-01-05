@@ -59,6 +59,9 @@ class VoiceUIConfig:
             switching back to hotword detection mode. If None, inactivity timeout
             is disabled.
             Default: None
+
+        remote_audio: Flag to enable remote audio processing.
+            Default: False
     """
 
     vad_engine: str = "SileroVAD"
@@ -71,6 +74,7 @@ class VoiceUIConfig:
     audio_transcriber: str = "whisper"
     tts_engine: str = "openai-tts"
     hotword_inactivity_timeout: Optional[float] = None
+    remote_audio: Optional[bool] = False
 
     def __post_init__(self):
         """Validate configuration parameters after initialization."""

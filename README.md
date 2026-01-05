@@ -30,6 +30,23 @@ Project layout (important files)
 - `Makefile` — helper targets for creating the virtualenv, running tests and lint
 - `pyproject.toml` — dependency groups (optional extras: `openai`, `google`, `local-whisper`, `silero`, `funasr`)
 
+Audio source design
+
+Voice UI treats audio input as an abstraction so that local microphones, remote/WebRTC streams, and test sources can be used interchangeably:
+
+- `AudioSourceBase` — a pure abstract interface in `voice_ui/audio_io/audio_source_base.py` defining:
+   - properties: `rate`, `chunk_size`, `channels`, `sample_format`, `sample_size`
+   - methods: `resume()`, `pause()`, and `generator()` (yields PCM byte chunks)
+- Concrete sources implement this interface:
+   - `MicrophoneStream` (`voice_ui/audio_io/microphone.py`) — local microphone via PyAudio
+   - `VirtualMicrophone` (`voice_ui/audio_io/virtual_microphone.py`) — frames injected programmatically (useful for testing, WebRTC integration, or synthetic audio sources)
+   - `WebRTCRemoteMicrophone` (`voice_ui/audio_io/webrtc_remote_microphone.py`) — autonomous WebRTC receiver combining `VirtualMicrophone` with WebRTC signaling
+- `AudioSourceFactory` (`voice_ui/audio_io/audio_source_factory.py`) maps source names (e.g. `"microphone"`, `"remote"`) to concrete classes so call sites can select sources by name or inject custom ones.
+- `VADAudioSource` (`voice_ui/speech_detection/vad_audio_source.py`) wraps any `AudioSourceBase` and applies VAD and optional hotword detection:
+   - consumes `source_instance` or a factory `source_name`
+   - exposes the same audio interface but its `generator()` yields only detected speech and uses `b""` as an end-of-utterance marker
+   - used by `SpeechDetector` as the unified audio front-end regardless of where the audio comes from
+
 Quick start (recommended)
 
 1. Create and activate a virtual environment using the Makefile helper:

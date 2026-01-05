@@ -22,7 +22,7 @@ class Player:
         with no_alsa_and_jack_errors():
             self._audio_interface = pyaudio.PyAudio()
 
-        self._stream = self._audio_interface.open(
+        self._audio_stream = self._audio_interface.open(
             format=format,
             channels=channels,
             rate=rate,
@@ -32,8 +32,8 @@ class Player:
         )
 
     def __del__(self):
-        self._stream.stop_stream()
-        self._stream.close()
+        self._audio_stream.stop_stream()
+        self._audio_stream.close()
         self._audio_interface.terminate()
 
     def get_devices(self, capture_devices: bool = False) -> Tuple[str, ...]:
@@ -63,7 +63,7 @@ class Player:
         if len(audio_data) == 0:
             return
 
-        self._stream.write(audio_data)
+        self._audio_stream.write(audio_data)
 
     def play_file(
         self,

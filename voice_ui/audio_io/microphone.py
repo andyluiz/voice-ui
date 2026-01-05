@@ -1,6 +1,7 @@
 import pyaudio
 from six.moves import queue
 
+from .audio_source_base import AudioSourceBase
 from .pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 
 # Audio recording parameters
@@ -8,16 +9,16 @@ RATE = 16000
 CHUNK = int(RATE / 20)  # 50ms
 
 
-class MicrophoneStream(object):
-    """Opens a recording stream as a generator yielding the audio chunks."""
+class MicrophoneStream(AudioSourceBase):
+    """Opens a recording stream as a generator yielding audio chunks."""
 
-    def __init__(self, rate=RATE, chunk=CHUNK):
-        self._sampleformat = pyaudio.paInt16
-        # The API currently only supports 1-channel (mono) audio
-        # https://goo.gl/z757pE
-        self._channels = 1
+    def __init__(self, rate: int = RATE, chunk: int = CHUNK) -> None:
+        # Backing attributes for AudioSourceBase interface
         self._rate = rate
         self._chunk = chunk
+        self._channels = 1
+        self._sample_format = pyaudio.paInt16
+        self._sample_size = 2
         self._max_bytes_per_yield = 25000
 
         # Create a thread-safe buffer of audio data
@@ -28,7 +29,7 @@ class MicrophoneStream(object):
             self._audio_interface = pyaudio.PyAudio()
 
         self._audio_stream = self._audio_interface.open(
-            format=self._sampleformat,
+            format=self._sample_format,
             channels=self._channels,
             rate=self._rate,
             input=True,
@@ -40,25 +41,32 @@ class MicrophoneStream(object):
             start=False,  # Do not start the stream immediately
         )
 
+        # Backing attributes `_channels`, `_rate`, `_chunk`, `_sample_format`,
+        # and `_sample_size` implement the AudioSourceBase contract.
+
+    # AudioSourceBase interface -------------------------------------------------
     @property
-    def channels(self):
+    def channels(self) -> int:
         return self._channels
 
     @property
-    def rate(self):
+    def rate(self) -> int:
         return self._rate
 
     @property
-    def chunk_size(self):
+    def chunk_size(self) -> int:
         return self._chunk
 
     @property
     def sample_format(self):
-        return self._sampleformat
+        return self._sample_format
 
     @property
-    def sample_size(self):
-        return self._audio_interface.get_sample_size(self._sampleformat)
+    def sample_size(self) -> int:
+        try:
+            return self._audio_interface.get_sample_size(self._sample_format)
+        except Exception:
+            return self._sample_size
 
     def __enter__(self):
         self.resume()
@@ -77,11 +85,11 @@ class MicrophoneStream(object):
         self._buff.put(in_data)
         return None, pyaudio.paContinue
 
-    def pause(self):
+    def pause(self) -> None:
         self._audio_stream.stop_stream()
         self._closed = True
 
-    def resume(self):
+    def resume(self) -> None:
         self._closed = False
         self._audio_stream.start_stream()
 

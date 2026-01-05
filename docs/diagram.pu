@@ -11,10 +11,8 @@ package voice_ui {
 
    package speech_detection {
       component speech_detector.SpeechDetector
-      package vad_microphone {
-         component MicrophoneVADStream
-         component HotwordDetector
-      }
+      component vad_audio_source.VADAudioSource
+      component hotword_detector.HotwordDetector
       component speaker_profile_manager.SpeakerProfileManager
    }
 
@@ -55,7 +53,12 @@ package voice_ui {
    package audio_io {
       component audio_data.AudioData
       component microphone.MicrophoneStream
+      component remote_microphone.RemoteMicrophone
       component player.Player
+      component audio_source_base.AudioSourceBase
+
+      AudioSourceBase <|.. MicrophoneStream
+      AudioSourceBase <|.. RemoteMicrophone
    }
 
    package voice_activity_detection {
@@ -89,19 +92,17 @@ PassThroughTextToSpeechAudioStreamer --o Player: play_data()
 ' GoogleTextToSpeechAudioStreamer --o [google]
 
 SpeechDetector --* SpeakerProfileManager: load_profiles()
-SpeechDetector --* MicrophoneVADStream: resume(), stop(), generator()
-SpeechDetector --* [picovoice.pveagle.Eagle]: create_recognizer()
+SpeechDetector --* VADAudioSource: resume(), pause(), generator()
 
 SpeakerProfileManager --o [picovoice.pveagle.EagleProfiler]: create_profiler()
 SpeakerProfileManager --o [picovoice.pveagle.EagleProfile]: from_bytes()
 SpeakerProfileManager --o [picovoice.pvrecorder.PvRecorder]: start(), read(), stop(), delete()
 
-MicrophoneStream <|-- MicrophoneVADStream
-MicrophoneVADStream --> VADFactory: create()
-MicrophoneVADStream --* IVoiceActivityDetector: process()
-MicrophoneVADStream --* [picovoice.pveagle.Eagle]: process(), delete()
-MicrophoneVADStream --o [picovoice.pveagle.EagleProfiler]
-MicrophoneVADStream -* HotwordDetector: process()
+AudioSourceBase <|.. VADAudioSource
+VADAudioSource --o AudioSourceBase: resume(), pause(), generator()
+VADAudioSource --> VADFactory: create()
+VADAudioSource --* IVoiceActivityDetector: process()
+VADAudioSource --* HotwordDetector: process()
 
 MicrophoneStream --* [pyaudio.PyAudio]
 Player --* [pyaudio.PyAudio]

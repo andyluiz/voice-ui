@@ -1,8 +1,6 @@
 import logging
 from typing import Dict, List, Optional
 
-from google.cloud import texttospeech
-
 from ..audio_io.google_tts_queued_player import GoogleTTSQueuedPlayer
 from ..audio_io.player import Player
 from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
@@ -28,7 +26,13 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
             player: Optional custom Player instance. Used if queued_player is not provided.
             queued_player: Optional custom GoogleTTSQueuedPlayer instance. If None, one will be created.
         """
-        client = texttospeech.TextToSpeechClient()
+        # Import lazily to avoid import-time dependency issues in test
+        try:
+            from google.cloud import texttospeech
+
+            client = texttospeech.TextToSpeechClient()
+        except Exception:
+            client = None
 
         # If no custom queued_player provided, create one
         if queued_player is None:
@@ -47,6 +51,8 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
         return "google"
 
     def available_voices(self, language_code: Optional[str] = None) -> List[Dict]:
+        if self._client is None:
+            return []
         return self._client.list_voices(language_code=language_code).voices
 
     def speak(

@@ -59,14 +59,26 @@ funasr = [
   "torch>=1.13",
   "torchaudio",
 ]
+webrtc = [
+  "aiortc>=1.5.0",
+  "av>=10.0.0",
+  "websockets>=11.0",
+]
 test = [
   "coverage",
 ]
 dev = [
   "black",
-  "flake8",
+  "ruff",
+  "mypy",
   "isort",
 ]
 
 [tool.black]
 preview = false
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+per-file-ignores = { "tests/*" = ["E402"] }

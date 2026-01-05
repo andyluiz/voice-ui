@@ -12,22 +12,60 @@ SRCS=$(call rwildcard,voice_ui,*.py) $(call rwildcard,tools,*.py) $(call rwildca
 
 all: checks tests
 
-checks: black flake8
+checks: format lint
 
 venv:
 	python -m venv --upgrade $(VENV)
 	$(VENV)/bin/pip install --upgrade pip
 	$(VENV)/bin/pip install -r requirements.txt
 
+.PHONY: install
+install:
+	@echo Installing dependencies into $(VENV)
+	$(VENV)/bin/pip install -r requirements.txt
+	$(VENV)/bin/pip install -e .
+
+.PHONY: help
+help:
+	@echo "voice_ui Makefile"
+	@echo
+	@echo "Usage: make [target]"
+	@echo
+	@echo "Targets:"
+	@echo "  help           Show this help message"
+	@echo "  venv           Create/upgrade virtual environment (.venv)"
+	@echo "  install        Install dependencies into the virtualenv"
+	@echo "  format         Format code (black)"
+	@echo "  lint           Run linters (flake8)"
+	@echo "  type-check     Run static type checks (mypy)"
+	@echo "  tests          Run unit tests with coverage"
+	@echo "  clean          Clean build artifacts"
+	@echo "  docs           Generate docs (doxygen)"
+
 .PHONY: black
 black:
 	@echo Running black
 	$(VENV)/bin/black --check --exclude .venv .
 
-.PHONY: flake8
-flake8:
-	@echo Running flake8
-	$(VENV)/bin/flake8 --exclude .venv .
+.PHONY: ruff
+ruff:
+	@echo Running ruff
+	$(VENV)/bin/ruff check . --exclude .venv
+
+.PHONY: format
+format:
+	@echo Formatting with black
+	$(VENV)/bin/black --exclude .venv .
+
+.PHONY: lint
+lint:
+	@echo Running ruff
+	$(VENV)/bin/ruff check . --exclude .venv
+
+.PHONY: type-check
+type-check:
+	@echo Running mypy
+	$(VENV)/bin/mypy .
 
 .PHONY: tests
 tests:
