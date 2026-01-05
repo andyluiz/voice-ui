@@ -20,7 +20,9 @@ def main():
     )
 
     try:
-        print("Listening for hotword...")
+        print(
+            "Listening for one of the following hotwords: ", stream.available_keywords
+        )
         stream.set_detection_mode(VADAudioSource.DetectionMode.HOTWORD)
 
         with wave.open("recorded_vad_audio.wav", "wb") as wav_file:
@@ -29,7 +31,9 @@ def main():
             wav_file.setframerate(stream.rate)
 
             for chunk in stream.generator():
-                print(f"detection_mode: {stream.detection_mode.name}, hotword: {stream.last_hotword_detected}")
+                print(
+                    f"detection_mode: {stream.detection_mode.name}, hotword: {stream.last_hotword_detected}"
+                )
                 if len(chunk) > 0:
                     wav_file.writeframes(chunk)
                 else:

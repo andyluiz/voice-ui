@@ -26,6 +26,11 @@ High-level architecture
   - Streamed and queued TTS players (Google TTS, OpenAI TTS, pass-through) provide both low-latency streaming and reliable queued playback.
   - Queued player implements producer-consumer behavior to serialize playback and avoid audio overlap.
 
+- Audio sinks and players
+  - The project exposes an `AudioSink` abstract base class (in `voice_ui/audio_io/audio_sink.py`) which defines the minimal runtime contract for playback backends: audio format properties (`rate`, `channels`, `chunk_size`, `sample_size`) and `play(bytes)` / `is_playing()` methods.
+  - `Player` is a PyAudio-backed implementation of `AudioSink`. `VirtualPlayer` and remote/WebRTC players also implement the same interface, allowing components to be written against the `AudioSink` abstraction.
+  - `QueuedAudioPlayer` serializes audio playback to avoid overlap. It accepts any `AudioSink` or legacy object exposing `play_data(bytes)` — the queued player will adapt `play_data` to `play` at runtime for backward compatibility.
+
 - Orchestration / High-level API
   - The voice_ui module exposes straightforward orchestration functions that wire together input -> VAD -> transcriber -> TTS.
   - Components are decoupled with events/callbacks or by returning async iterators, enabling both synchronous scripts and asynchronous real-time systems.

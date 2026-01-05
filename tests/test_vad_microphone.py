@@ -2,11 +2,11 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-from voice_ui.audio_io.audio_source_base import AudioSourceBase
+from voice_ui.audio_io.audio_source import AudioSource
 from voice_ui.speech_detection.vad_audio_source import VADAudioSource
 
 
-class FakeSource(AudioSourceBase):
+class FakeSource(AudioSource):
     """Simple AudioSourceBase implementation for testing.
 
     It yields chunks from a predefined list and then stops.

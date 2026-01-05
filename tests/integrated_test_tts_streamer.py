@@ -26,13 +26,13 @@ class CapturingPlayer(Player):
         else:
             super().__init__()
 
-    def play_data(self, audio_data):
+    def play(self, audio_data):
         """Capture audio data instead of playing it."""
         with self.audio_lock:
             if audio_data:
                 self.captured_audio.append(audio_data)
                 if self._audio_stream:
-                    super().play_data(audio_data)
+                    super().play(audio_data)
 
     def terminate(self):
         """No-op for mock player."""

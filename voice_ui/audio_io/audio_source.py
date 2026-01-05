@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Iterator
 
 
-class AudioSourceBase(ABC):
+class AudioSource(ABC):
     """Abstract interface for audio sources (local and remote).
 
     Implementations must provide:

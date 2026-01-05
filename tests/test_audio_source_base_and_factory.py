@@ -1,10 +1,10 @@
 import unittest
 
-from voice_ui.audio_io.audio_source_base import AudioSourceBase
+from voice_ui.audio_io.audio_source import AudioSource
 from voice_ui.audio_io.audio_source_factory import AudioSourceFactory
 
 
-class DummySource(AudioSourceBase):
+class DummySource(AudioSource):
     def __init__(self, rate=8000, chunk=400, channels=1, sample_size=None):
         self._rate = rate
         self._chunk = chunk

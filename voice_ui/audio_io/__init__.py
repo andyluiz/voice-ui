@@ -9,6 +9,7 @@ This module provides audio input/output abstractions including:
 
 # Import core classes for public API
 from .audio_data import AudioData
+from .audio_sink import AudioSink
 from .audio_sink_factory import AudioSinkFactory
 from .audio_source_factory import AudioSourceFactory
 from .microphone import MicrophoneStream
@@ -44,6 +45,7 @@ except ImportError:
 
 __all__ = [
     "AudioData",
+    "AudioSink",
     "AudioSourceFactory",
     "AudioSinkFactory",
     "MicrophoneStream",

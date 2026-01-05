@@ -97,6 +97,10 @@ class WebRTCRemoteMicrophone(VirtualMicrophone):
 
     def start(self) -> None:
         """Start RemoteMicrophone and WebRTC signaling server."""
+        # Prevent double-start
+        if self._signaling_server is not None:
+            return
+
         # Start parent RemoteMicrophone
         super().start()
 
@@ -209,15 +213,18 @@ class WebRTCRemoteMicrophone(VirtualMicrophone):
         serving_dir = str(html_path.parent)
 
         def run_server() -> None:
-            handler = type(
-                "Handler",
-                (SimpleHTTPRequestHandler,),
-                {"directory": serving_dir},
-            )
+            # Create a handler class with the serving directory
+            class Handler(SimpleHTTPRequestHandler):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, directory=serving_dir, **kwargs)
+
             try:
+                # Create ThreadingHTTPServer with SO_REUSEADDR
                 self._http_server = ThreadingHTTPServer(
-                    ("127.0.0.1", self._http_port), handler
+                    ("127.0.0.1", self._http_port), Handler
                 )
+                # Allow port reuse to avoid "Address already in use" errors
+                self._http_server.allow_reuse_address = True
                 logger.info(
                     f"HTTP server started at http://127.0.0.1:{self._http_port} "
                     f"(serving {serving_dir})"

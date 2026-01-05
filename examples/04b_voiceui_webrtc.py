@@ -33,7 +33,14 @@ from voice_ui import (  # type: ignore
     VoiceUI,
     VoiceUIConfig,
 )
-from voice_ui.audio_io.webrtc_remote_microphone import WebRTCRemoteMicrophone
+from voice_ui.config import AudioIOConfig, SpeechDetectionConfig, TextToSpeechConfig
+
+try:
+    from voice_ui.audio_io.webrtc_remote_microphone import WebRTCRemoteMicrophone
+
+    WEBRTC_AVAILABLE = True
+except ImportError:
+    WEBRTC_AVAILABLE = False
 
 
 def print_event(msg: str) -> None:
@@ -46,15 +53,37 @@ def print_event(msg: str) -> None:
 def main() -> None:
     dotenv.load_dotenv()
 
+    # Check if WebRTC is available
+    if not WEBRTC_AVAILABLE:
+        print(f"{Fore.RED}Error: WebRTC components not available.{Fore.RESET}")
+        print(f"{Fore.YELLOW}Install with: pip install voice-ui[webrtc]{Fore.RESET}")
+        return
+
     # Create WebRTC microphone with built-in signaling and HTTP server
     examples_dir = Path(__file__).parent
-    remote_mic = WebRTCRemoteMicrophone(
-        signaling_port=8765,
-        serve_html=True,
-        html_path=examples_dir / "webrtc_sender.html",
-        http_port=8000,
-    )
-    remote_mic.start()
+    remote_mic = None
+    try:
+        remote_mic = WebRTCRemoteMicrophone(
+            signaling_port=8765,
+            serve_html=True,
+            html_path=examples_dir / "webrtc_sender.html",
+            http_port=8000,
+        )
+        remote_mic.start()
+    except OSError as e:
+        print(f"{Fore.RED}Error starting WebRTC server: {e}{Fore.RESET}")
+        if "Address already in use" in str(e):
+            print(
+                f"{Fore.YELLOW}One of the ports (8000, 8765) is already in use.{Fore.RESET}"
+            )
+            print(
+                f"{Fore.YELLOW}Kill the process with: kill $(lsof -ti :8000,:8765){Fore.RESET}"
+            )
+            print(f"{Fore.YELLOW}Or use: lsof -i :8000,:8765{Fore.RESET}")
+        return
+    except Exception as e:
+        print(f"{Fore.RED}Error creating WebRTC microphone: {e}{Fore.RESET}")
+        return
 
     print_event("HTTP server running at http://127.0.0.1:8000/webrtc_sender.html")
     print_event("WebSocket signaling server listening at ws://127.0.0.1:8765")
@@ -62,17 +91,30 @@ def main() -> None:
     events = queue.Queue()
 
     config = VoiceUIConfig(
-        post_speech_duration=1.0,
-        max_speech_duration=10,
-        tts_engine="passthrough",
+        speech_detection=SpeechDetectionConfig(
+            post_speech_duration=1.0,
+            max_speech_duration=10,
+            voice_profiles_dir=None,  # Disable speaker identification (Eagle version issues)
+        ),
+        # Use 'passthrough' to avoid TTS API key requirement, or use 'openai' if OPENAI_API_KEY is set
+        text_to_speech=TextToSpeechConfig(engine="google"),
+        audio_io=AudioIOConfig(audio_source_instance=remote_mic),
     )
 
     # Use WebRTCRemoteMicrophone as the audio source
-    voice_ui = VoiceUI(
-        speech_callback=lambda event: events.put(event),
-        config=config,
-        source_instance=remote_mic,
-    )
+    try:
+        voice_ui = VoiceUI(
+            speech_callback=lambda event: events.put(event),
+            config=config,
+        )
+    except Exception as e:
+        print(f"{Fore.RED}Error initializing VoiceUI: {e}{Fore.RESET}")
+        print(
+            f"{Fore.YELLOW}Check environment variables (PORCUPINE_ACCESS_KEY, OPENAI_API_KEY).{Fore.RESET}"
+        )
+        if remote_mic:
+            remote_mic.stop()
+        return
 
     def process_event() -> None:
         event = events.get(timeout=1)
@@ -98,7 +140,10 @@ def main() -> None:
                 f'{Fore.GREEN}Transcription event. Text: "{text}", '
                 f"Speaker: {event.get('speaker')}{Fore.RESET}"
             )
-            voice_ui.speak(text)
+            try:
+                voice_ui.speak(text)
+            except Exception as e:
+                print_event(f"{Fore.RED}Error speaking: {e}{Fore.RESET}")
 
         else:
             print_event(str(event))
@@ -122,7 +167,8 @@ def main() -> None:
     finally:
         print(f"{Fore.MAGENTA}Terminating...{Fore.RESET}")
         voice_ui.terminate()
-        remote_mic.stop()
+        if remote_mic:
+            remote_mic.stop()
 
 
 if __name__ == "__main__":

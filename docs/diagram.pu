@@ -51,14 +51,21 @@ package voice_ui {
    }
 
    package audio_io {
-      component audio_data.AudioData
+      ' component audio_data.AudioData
       component microphone.MicrophoneStream
       component remote_microphone.RemoteMicrophone
       component player.Player
       component audio_source_base.AudioSourceBase
+      component audio_sink.AudioSink
+      component queued_player.QueuedAudioPlayer
+      component virtual_player.VirtualPlayer
 
       AudioSourceBase <|.. MicrophoneStream
       AudioSourceBase <|.. RemoteMicrophone
+      AudioSink <|.. Player
+      AudioSink <|.. VirtualPlayer
+
+      QueuedAudioPlayer --o AudioSink: play()
    }
 
    package voice_activity_detection {
@@ -87,7 +94,7 @@ VoiceUI --o SpeechToTextTranscriber: transcribe()
 VoiceUI --* TextToSpeechAudioStreamer: speak(), stop()
 VoiceUI --> TextToSpeechAudioStreamerFactory: create()
 
-PassThroughTextToSpeechAudioStreamer --o Player: play_data()
+PassThroughTextToSpeechAudioStreamer --o QueuedAudioPlayer: queue_audio(), queue_size(), stop(), resume(), is_stopped(), is_speaking(), terminate()
 ' OpenAITextToSpeechAudioStreamer --o [requests]
 ' GoogleTextToSpeechAudioStreamer --o [google]
 
@@ -117,11 +124,11 @@ end note
 
 WhisperTranscriber --* [openai.OpenAI]
 
-SpeechDetector ..> AudioData
-WhisperTranscriber ..> AudioData
-LocalWhisperTranscriber ..> AudioData
-SpeechToTextTranscriber ..> AudioData
-PassThroughTextToSpeechAudioStreamer ..> AudioData
+' SpeechDetector ..> AudioData
+' WhisperTranscriber ..> AudioData
+' LocalWhisperTranscriber ..> AudioData
+' SpeechToTextTranscriber ..> AudioData
+' PassThroughTextToSpeechAudioStreamer ..> AudioData
 
 ' PicoVoiceVAD --* [picovoice.pvcobra.Cobra]: process(), delete()
 

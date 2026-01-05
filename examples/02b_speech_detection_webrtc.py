@@ -1,14 +1,14 @@
-"""Simple speech detection using a simulated remote audio source.
+"""Simple speech detection using a simulated virtual audio source.
 
 This example demonstrates how to:
 
 - Capture audio from the local microphone (MicrophoneStream)
-- Forward those frames into a RemoteMicrophone via push_frame()
-- Run SpeechDetector on the RemoteMicrophone as if audio were coming
-    from a real remote/WebRTC peer
+- Forward those frames into a VirtualMicrophone via push_frame()
+- Run SpeechDetector on the VirtualMicrophone as if audio were coming
+    from a real virtual/WebRTC peer
 
 It is functionally similar to 02_simple_speech_detection_from_mic_stream,
-but exercises the RemoteMicrophone + AudioSourceBase abstraction layer.
+but exercises the VirtualMicrophone + AudioSourceBase abstraction layer.
 """
 
 import os
@@ -22,7 +22,7 @@ from six.moves import queue
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from voice_ui.audio_io.microphone import MicrophoneStream
-from voice_ui.audio_io.remote_microphone import RemoteMicrophone
+from voice_ui.audio_io.virtual_microphone import VirtualMicrophone
 from voice_ui.speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -63,17 +63,17 @@ def process_event():
         raise Exception("Unknown event: {}".format(event))
 
 
-# Helper to feed audio from the local microphone into the RemoteMicrophone.
-def _start_mic_feeder(remote_mic: RemoteMicrophone, mic: MicrophoneStream) -> None:
+# Helper to feed audio from the local microphone into the VirtualMicrophone.
+def _start_mic_feeder(virtual_mic: VirtualMicrophone, mic: MicrophoneStream) -> None:
     def _run() -> None:
         try:
             mic.resume()
             for data in mic.generator():
                 if not data:
                     break
-                remote_mic.push_frame(data)
+                virtual_mic.push_frame(data)
         except Exception as exc:  # pragma: no cover - diagnostic only
-            print(f"Error feeding microphone audio to RemoteMicrophone: {exc}")
+            print(f"Error feeding microphone audio to VirtualMicrophone: {exc}")
 
     feeder = threading.Thread(target=_run, daemon=True)
     feeder.start()
@@ -81,28 +81,30 @@ def _start_mic_feeder(remote_mic: RemoteMicrophone, mic: MicrophoneStream) -> No
 
 # Main function
 def main():
-    print("Creating remote microphone and speech detector...")
+    print("Creating virtual microphone and speech detector...")
 
-    # Local microphone used as the actual capture device.
-    mic = MicrophoneStream()
-    remote_mic = RemoteMicrophone()
+    # Create virtual microphone
+    virtual_mic = VirtualMicrophone()
 
     speech_detector = SpeechDetector(
         on_speech_event=lambda event: events.put(event),
-        source_instance=remote_mic,
+        source_instance=virtual_mic,
     )
 
     print(
-        "Forwarding local microphone audio into RemoteMicrophone "
-        "(simulating a remote source)."
+        "Forwarding local microphone audio into VirtualMicrophone "
+        "(simulating a virtual source)."
     )
 
-    # Start feeding microphone frames into the RemoteMicrophone.
-    _start_mic_feeder(remote_mic, mic)
+    # Start feeding microphone frames into the VirtualMicrophone.
+    # Local microphone used as the actual capture device.
+    mic = MicrophoneStream()
+    _start_mic_feeder(virtual_mic, mic)
 
-    # Start remote mic and detector
-    remote_mic.start()
-    print("Listening for speech (remote)...")
+    # Start virtual mic and detector
+    virtual_mic.start()
+
+    print("Listening for speech (virtual)...")
     speech_detector.start()
 
     try:
@@ -117,7 +119,7 @@ def main():
         print("Stopping...")
         speech_detector.stop()
         mic.pause()
-        remote_mic.stop()
+        virtual_mic.stop()
 
 
 if __name__ == "__main__":

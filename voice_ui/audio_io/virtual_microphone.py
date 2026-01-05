@@ -10,7 +10,7 @@ import queue
 import threading
 from typing import Callable, Optional
 
-from .audio_source_base import AudioSourceBase
+from .audio_source import AudioSource
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ except ImportError:
     _DEFAULT_SAMPLE_FORMAT = None
 
 
-class VirtualMicrophone(AudioSourceBase):
+class VirtualMicrophone(AudioSource):
     """Queue-based microphone for programmatic audio frame injection.
 
     This class allows applications to push audio frames (as bytes) into an

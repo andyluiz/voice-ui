@@ -10,7 +10,7 @@ class FakePlayer:
         self.played = []
         self.raise_on_play = raise_on_play
 
-    def play_data(self, data: bytes):
+    def play(self, data: bytes):
         if self.raise_on_play:
             raise RuntimeError("boom")
         self.played.append(data)

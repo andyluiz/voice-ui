@@ -153,6 +153,16 @@ Code snippets
    # ... detector runs in background; call `detector.stop()` to stop it
    ```
 
+Audio sink design
+
+- `AudioSink` — a small abstract base class (`voice_ui/audio_io/audio_sink.py`) that defines the runtime contract for audio sinks (things that accept PCM bytes for playback). Concrete sinks expose simple metadata properties and play semantics:
+   - properties: `rate`, `chunk_size`, `channels`, `sample_size`
+   - methods: `play(bytes)` to accept raw PCM bytes and `is_playing()` to query state
+- `Player` (`voice_ui/audio_io/player.py`) implements `AudioSink` and provides a PyAudio-backed speaker output. `VirtualPlayer` implements the same interface for queue-based or test usage.
+- `QueuedAudioPlayer` is a producer-consumer helper that serializes playback through a background thread; it accepts any `AudioSink` (or legacy objects exposing `play_data(bytes)`) and will adapt `play_data` calls to the expected `play(bytes)` runtime method when needed.
+
+Use `AudioSink` as the preferred type for function signatures and configuration points so callers can accept any sink implementation (local player, virtual player, WebRTC remote sink, etc.).
+
 - OpenAI TTS streamer (requires `OPENAI_API_KEY` in environment). It plays streamed audio via the built-in player thread.
 
    ```python

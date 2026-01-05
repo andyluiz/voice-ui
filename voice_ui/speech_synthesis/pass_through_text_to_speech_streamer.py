@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional, Union
 
 from ..audio_io.audio_data import AudioData
-from ..audio_io.player import Player
+from ..audio_io.audio_sink import AudioSink
 from ..audio_io.queued_player import QueuedAudioPlayer
 from .text_to_speech_streamer import TextToSpeechAudioStreamer
 
@@ -19,14 +19,14 @@ class PassThroughTextToSpeechAudioStreamer(TextToSpeechAudioStreamer):
 
     def __init__(
         self,
-        player: Optional[Player] = None,
+        player: Optional[AudioSink] = None,
         queued_player: Optional[QueuedAudioPlayer] = None,
     ):
         """
         Initialize the PassThroughTextToSpeechAudioStreamer.
 
         Args:
-            player: Optional custom Player instance. Used if queued_player is not provided.
+            player: Optional custom AudioSink instance. Used if queued_player is not provided.
             queued_player: Optional custom QueuedAudioPlayer instance. If None, one will be created.
         """
         if queued_player is not None:

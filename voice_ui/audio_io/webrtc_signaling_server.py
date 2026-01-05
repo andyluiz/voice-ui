@@ -34,7 +34,6 @@ try:
     import websockets
     from aioice.candidate import Candidate as AioiceCandidate
     from aiortc import RTCIceCandidate, RTCPeerConnection, RTCSessionDescription
-    from aiortc.rtcconnection import RTCConnection
 
     _WEBRTC_COMPONENTS_AVAILABLE = True
 except Exception:
@@ -42,7 +41,6 @@ except Exception:
     AioiceCandidate = None  # type: ignore
     RTCIceCandidate = None  # type: ignore
     RTCPeerConnection = None  # type: ignore
-    RTCConnection = None  # type: ignore
     _WEBRTC_COMPONENTS_AVAILABLE = False
 
 
@@ -225,26 +223,25 @@ class WebRTCSignalingServer:
                     sdp = sdp.split(" ", 1)[1]
 
                 try:
+                    # Parse candidate using AioiceCandidate, then create RTCIceCandidate
                     parsed_candidate = AioiceCandidate.from_sdp(sdp)
-                except ValueError as e:
-                    logger.warning(f"Failed to parse ICE candidate: {e}")
-                    return
-
-                ice_candidate = RTCIceCandidate(
-                    component=parsed_candidate.component,
-                    foundation=parsed_candidate.foundation,
-                    ip=parsed_candidate.host,
-                    port=parsed_candidate.port,
-                    priority=parsed_candidate.priority,
-                    protocol=parsed_candidate.transport,
-                    type=parsed_candidate.type,
-                    relatedAddress=parsed_candidate.related_address,
-                    relatedPort=parsed_candidate.related_port,
-                    sdpMid=candidate_data.get("sdpMid"),
-                    sdpMLineIndex=candidate_data.get("sdpMLineIndex"),
-                    tcpType=parsed_candidate.tcptype,
-                )
-                await pc.addIceCandidate(ice_candidate)
-                logger.debug("ICE candidate added")
+                    ice_candidate = RTCIceCandidate(
+                        component=parsed_candidate.component,
+                        foundation=parsed_candidate.foundation,
+                        ip=parsed_candidate.host,
+                        port=parsed_candidate.port,
+                        priority=parsed_candidate.priority,
+                        protocol=parsed_candidate.transport.upper(),
+                        type=parsed_candidate.type,
+                        relatedAddress=parsed_candidate.related_address,
+                        relatedPort=parsed_candidate.related_port,
+                        sdpMid=candidate_data.get("sdpMid"),
+                        sdpMLineIndex=candidate_data.get("sdpMLineIndex"),
+                    )
+                    await pc.addIceCandidate(ice_candidate)
+                    logger.debug("ICE candidate added")
+                except (ValueError, AttributeError) as e:
+                    # Skip candidates we can't parse
+                    logger.debug(f"Skipping ICE candidate: {e}")
         else:
             logger.warning(f"Unknown signaling message type: {msg_type}")

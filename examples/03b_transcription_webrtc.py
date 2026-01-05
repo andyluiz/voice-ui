@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 
 import dotenv
 from colorama import Fore
@@ -7,7 +8,8 @@ from six.moves import queue
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from voice_ui.audio_io.remote_microphone import RemoteMicrophone
+from voice_ui.audio_io.microphone import MicrophoneStream
+from voice_ui.audio_io.virtual_microphone import VirtualMicrophone
 from voice_ui.speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -64,19 +66,45 @@ def process_event():
         raise Exception("Unknown event: {}".format(event))
 
 
+# Helper to feed audio from the local microphone into the VirtualMicrophone.
+def _start_mic_feeder(virtual_mic: VirtualMicrophone, mic: MicrophoneStream) -> None:
+    def _run() -> None:
+        try:
+            mic.resume()
+            for data in mic.generator():
+                if not data:
+                    break
+                virtual_mic.push_frame(data)
+        except Exception as exc:  # pragma: no cover - diagnostic only
+            print(f"Error feeding microphone audio to VirtualMicrophone: {exc}")
+
+    feeder = threading.Thread(target=_run, daemon=True)
+    feeder.start()
+
+
 # Main function
 def main():
-    print("Creating remote microphone and speech detector...")
-    remote_mic = RemoteMicrophone()
+    print("Creating virtual microphone and speech detector...")
+    virtual_mic = VirtualMicrophone()
 
     speech_detector = SpeechDetector(
         on_speech_event=lambda event: events.put(event),
-        source_instance=remote_mic,
+        source_instance=virtual_mic,
     )
 
-    # Start remote mic and detector
-    remote_mic.start()
-    print("Listening for speech (remote)...")
+    print(
+        "Forwarding local microphone audio into VirtualMicrophone "
+        "(simulating a virtual source)."
+    )
+
+    # Start feeding microphone frames into the VirtualMicrophone.
+    mic = MicrophoneStream()
+    _start_mic_feeder(virtual_mic, mic)
+
+    # Start virtual mic and detector
+    virtual_mic.start()
+
+    print("Listening for speech (virtual)...")
     speech_detector.start()
 
     while True:
@@ -89,7 +117,7 @@ def main():
 
     print("Stopping...")
     speech_detector.stop()
-    remote_mic.stop()
+    virtual_mic.stop()
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ This file gives concise, actionable knowledge for AI coding agents to be immedia
 **Package Structure** (`voice_ui/` main package):
    - `audio_io/` — audio I/O abstractions and integrations:
      - Microphone capture: `microphone.py`, `virtual_microphone.py`
-     - Audio playback: `player.py`, `virtual_player.py`
+       - Audio playback and sinks: `audio_sink.py` (defines `AudioSink`), `player.py` (PyAudio `Player` implements `AudioSink`), `virtual_player.py`
      - WebRTC integration: `webrtc_signaling_server.py`, `webrtc_remote_microphone.py`, `webrtc_remote_player.py`
      - Factories and utilities: `audio_source_factory.py`, `audio_sink_factory.py`, `audio_data.py`
 - `voice_activity_detection/` — VAD engines + factory pattern (`vad_factory.py` registers engines: `SileroVAD`, `FunASRVAD`, `PicoVoiceVAD`)

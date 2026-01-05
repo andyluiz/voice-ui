@@ -2,6 +2,7 @@ import logging
 import threading
 from typing import Optional, Type
 
+from .audio_sink import AudioSink
 from .player import Player
 from .virtual_player import VirtualPlayer
 
@@ -26,7 +27,7 @@ class AudioSinkFactory:
         raise RuntimeError(f"Engine '{sink_name}' is not available")
 
     @classmethod
-    def register_sink(cls, name: str, sink_class: Type):
+    def register_sink(cls, name: str, sink_class: Type[AudioSink]):
         with cls._lock:
             cls._sinks[name] = sink_class
 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from enum import Enum, auto, unique
 from typing import Deque, Dict, Iterator, List, Optional
 
-from ..audio_io.audio_source_base import AudioSourceBase
+from ..audio_io.audio_source import AudioSource
 from ..audio_io.audio_source_factory import AudioSourceFactory
 from ..voice_activity_detection.vad_factory import VADFactory
 from ..voice_activity_detection.vad_i import IVoiceActivityDetector
@@ -15,7 +15,7 @@ from .hotword_detector import HotwordDetector
 logger = logging.getLogger(__name__)
 
 
-class VADAudioSource(AudioSourceBase):
+class VADAudioSource(AudioSource):
     """Audio source wrapper that applies VAD and optional hotword detection.
 
     This class wraps any `AudioSourceBase` implementation (microphone,
@@ -69,7 +69,7 @@ class VADAudioSource(AudioSourceBase):
         source_kwargs = kwargs.pop("source_kwargs", None) or {}
 
         if source_instance is not None:
-            self._source: AudioSourceBase = source_instance
+            self._source: AudioSource = source_instance
         else:
             name = source_name if source_name is not None else "microphone"
             self._source = AudioSourceFactory.create(name, **source_kwargs)

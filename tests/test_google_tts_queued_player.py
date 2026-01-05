@@ -59,7 +59,7 @@ class TestGoogleTTSQueuedPlayer(unittest.TestCase):
             ("hi", None, {"language_code": "en-US"})
         )
 
-        self.assertTrue(self.player.play_data.called)
+        self.assertTrue(self.player.play.called)
         self.assertFalse(self.player_instance._speaking)
 
     def test_process_queue_item_handles_google_api_error(self):

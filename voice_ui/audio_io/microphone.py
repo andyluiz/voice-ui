@@ -1,7 +1,7 @@
 import pyaudio
 from six.moves import queue
 
-from .audio_source_base import AudioSourceBase
+from .audio_source import AudioSource
 from .pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 
 # Audio recording parameters
@@ -9,7 +9,7 @@ RATE = 16000
 CHUNK = int(RATE / 20)  # 50ms
 
 
-class MicrophoneStream(AudioSourceBase):
+class MicrophoneStream(AudioSource):
     """Opens a recording stream as a generator yielding audio chunks."""
 
     def __init__(self, rate: int = RATE, chunk: int = CHUNK) -> None:

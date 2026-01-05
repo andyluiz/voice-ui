@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional
 
 from ..audio_io.google_tts_queued_player import GoogleTTSQueuedPlayer
-from ..audio_io.player import Player
+from ..audio_io.audio_sink import AudioSink
 from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
 
     def __init__(
         self,
-        player: Optional[Player] = None,
+        player: Optional[AudioSink] = None,
         queued_player: Optional[GoogleTTSQueuedPlayer] = None,
     ):
         """Initialize the Google TTS streamer.

@@ -78,11 +78,11 @@ class TestPlayer(unittest.TestCase):
     def test_play_data_empty_and_non_empty(self):
         p = make_player_with_fake()
         p._audio_stream = FakeStream()
-        p.play_data(b"")
+        p.play(b"")
         self.assertEqual(p._audio_stream.written, b"")
 
         p._audio_stream = FakeStream()
-        p.play_data(b"abc")
+        p.play(b"abc")
         self.assertEqual(p._audio_stream.written, b"abc")
 
     def test_play_file_reads_wav_and_writes(self):

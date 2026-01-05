@@ -1,6 +1,6 @@
 import unittest
 
-from voice_ui.audio_io.audio_source_base import AudioSourceBase
+from voice_ui.audio_io.audio_source import AudioSource
 from voice_ui.audio_io.audio_source_factory import AudioSourceFactory
 from voice_ui.audio_io.virtual_microphone import VirtualMicrophone
 from voice_ui.speech_detection.vad_audio_source import VADAudioSource
@@ -33,7 +33,7 @@ class TestRemoteMicrophone(unittest.TestCase):
         self.assertEqual(val, b"zzz")
 
 
-class SimpleSource(AudioSourceBase):
+class SimpleSource(AudioSource):
     def __init__(self):
         self._rate = 16000
         self._chunk = 800
