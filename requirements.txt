@@ -4,6 +4,7 @@ pveagle
 pvporcupine
 pvrecorder
 pyaudio
+aiortc
 python-dotenv
 requests
 six
@@ -23,5 +24,6 @@ torchaudio  # FunASR dependency
 # Tools
 black
 coverage  # Measure code/test coverage
-flake8  # Python linting
+ruff  # Python linting (replaces flake8)
+mypy  # static type checker
 isort

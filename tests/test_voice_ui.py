@@ -12,6 +12,7 @@ from voice_ui import (
     VoiceUIConfig,
     WaitingForHotwordEvent,
 )
+from voice_ui.config import SpeechDetectionConfig
 from voice_ui.speech_detection.speech_detector import (
     MetaDataEvent,
     PartialSpeechEndedEvent,
@@ -28,7 +29,9 @@ class TestVoiceUI(unittest.TestCase):
     def setUp(self):
         self.mock_speech_callback = MagicMock()
         self.mock_config = VoiceUIConfig(
-            voice_profiles_dir=Path("/tmp/voice_profiles"),
+            speech_detection=SpeechDetectionConfig(
+                voice_profiles_dir=Path("/tmp/voice_profiles"),
+            )
         )
 
         with (
@@ -90,8 +93,10 @@ class TestVoiceUI(unittest.TestCase):
         self.voice_ui._tts_streamer.is_speaking = MagicMock(return_value=False)
         self.voice_ui._terminated = False
         self.voice_ui._config = VoiceUIConfig(
-            voice_profiles_dir=Path("/tmp/voice_profiles"),
-            hotword_inactivity_timeout=30,
+            speech_detection=SpeechDetectionConfig(
+                voice_profiles_dir=Path("/tmp/voice_profiles"),
+                hotword_inactivity_timeout=30,
+            )
         )
 
         def spech_input_get_side_effect(timeout):

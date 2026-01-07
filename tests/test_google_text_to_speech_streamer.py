@@ -9,7 +9,7 @@ from voice_ui.speech_synthesis.google_text_to_speech_streamer import (
 
 
 def player_init(self):
-    self._stream = MagicMock()
+    self._audio_stream = MagicMock()
     self._audio_interface = MagicMock()
 
 

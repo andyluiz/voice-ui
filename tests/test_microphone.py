@@ -24,13 +24,13 @@ class TestMicrophoneStream(unittest.TestCase):
         self.assertEqual(self.stream._channels, 1)
         self.assertEqual(self.stream.channels, 1)
 
-        self.assertEqual(self.stream._sampleformat, pyaudio.paInt16)
+        self.assertEqual(self.stream._sample_format, pyaudio.paInt16)
         self.assertEqual(self.stream.sample_format, pyaudio.paInt16)
 
         self.stream._audio_interface.get_sample_size = MagicMock(return_value=1234)
         self.assertEqual(self.stream.sample_size, 1234)
         self.stream._audio_interface.get_sample_size.assert_called_once_with(
-            self.stream._sampleformat
+            self.stream._sample_format
         )
 
         self.assertTrue(self.stream._closed)

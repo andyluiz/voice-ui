@@ -6,7 +6,7 @@ from typing import Any, Optional
 from google.api_core import exceptions
 from google.cloud import texttospeech
 
-from .player import Player
+from .audio_sink import AudioSink
 from .queued_player import QueuedAudioPlayer
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
     def __init__(
         self,
         client: texttospeech.TextToSpeechClient,
-        player: Optional[Player] = None,
+        player: Optional[AudioSink] = None,
         input_timeout: float = 3,
     ):
         """
@@ -34,12 +34,12 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
 
         Args:
             client: Google TextToSpeechClient instance.
-            player: Optional Player instance. If None, a default Player will be created.
+            player: Optional AudioSink instance. If None, a default Player will be created.
             input_timeout: Timeout for getting text from queue (Google's streaming has 5 second limit).
         """
+        super().__init__(player=player)
         self._client = client
         self._input_timeout = input_timeout
-        super().__init__(player=player)
 
     def _get_queue_timeout(self) -> float:
         """Override timeout to match Google's streaming timeout requirements."""
@@ -82,7 +82,7 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
                     break
 
                 if response.audio_content:
-                    self._player.play_data(response.audio_content)
+                    self._player.play(response.audio_content)
 
             self._speaking = False
 

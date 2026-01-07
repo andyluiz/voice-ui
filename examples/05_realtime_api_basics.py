@@ -21,6 +21,11 @@ from voice_ui import (
     VoiceUI,
     VoiceUIConfig,
 )
+from voice_ui.config import (
+    SpeechDetectionConfig,
+    TextToSpeechConfig,
+    TranscriptionConfig,
+)
 
 dotenv.load_dotenv()
 
@@ -209,11 +214,15 @@ def main():
     )
 
     config = VoiceUIConfig(
-        voice_profiles_dir=Path(os.path.join(Path(__file__).parent, "voice_profiles")),
-        post_speech_duration=1.0,
-        max_speech_duration=10,
-        audio_transcriber=None,
-        tts_engine="passthrough",
+        speech_detection=SpeechDetectionConfig(
+            voice_profiles_dir=Path(
+                os.path.join(Path(__file__).parent, "voice_profiles")
+            ),
+            post_speech_duration=1.0,
+            max_speech_duration=10,
+        ),
+        transcription=TranscriptionConfig(engine=None),
+        text_to_speech=TextToSpeechConfig(engine="passthrough"),
     )
 
     url = "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview"

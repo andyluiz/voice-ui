@@ -6,18 +6,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional
 
+from voice_ui.audio_io.audio_sink import AudioSink
+from voice_ui.audio_io.audio_source import AudioSource
+
 
 @dataclass
-class VoiceUIConfig:
+class SpeechDetectionConfig:
     """
-    Configuration for the VoiceUI class.
-
-    This replaces the loose dictionary-based configuration with a typed,
-    documented configuration class that provides:
-    - Type safety and IDE autocomplete
-    - Clear documentation of all available settings
-    - Default values in one place
-    - Validation of configuration parameters
+    Configuration for speech detection (VAD + hotword detection).
 
     Attributes:
         vad_engine: Voice Activity Detection engine to use.
@@ -47,14 +43,6 @@ class VoiceUIConfig:
             custom keyword file paths. Used for hotword detection beyond default.
             Default: {}
 
-        audio_transcriber: Speech-to-text engine factory name.
-            Supported values: 'whisper', 'local-whisper'
-            Default: 'whisper'
-
-        tts_engine: Text-to-speech engine factory name.
-            Supported values: 'openai-tts', 'google', 'passthrough'
-            Default: 'openai-tts'
-
         hotword_inactivity_timeout: Seconds of inactivity before automatically
             switching back to hotword detection mode. If None, inactivity timeout
             is disabled.
@@ -68,12 +56,10 @@ class VoiceUIConfig:
     max_speech_duration: int = 10
     voice_profiles_dir: Optional[Path] = None
     additional_keyword_paths: Dict[str, str] = field(default_factory=dict)
-    audio_transcriber: str = "whisper"
-    tts_engine: str = "openai-tts"
     hotword_inactivity_timeout: Optional[float] = None
 
     def __post_init__(self):
-        """Validate configuration parameters after initialization."""
+        """Validate speech detection configuration parameters."""
         # Convert string paths to Path objects if needed
         if isinstance(self.voice_profiles_dir, str):
             self.voice_profiles_dir = Path(self.voice_profiles_dir)
@@ -108,3 +94,86 @@ class VoiceUIConfig:
             raise ValueError(
                 f"hotword_inactivity_timeout must be positive or None, got {self.hotword_inactivity_timeout}"
             )
+
+
+@dataclass
+class TranscriptionConfig:
+    """
+    Configuration for speech-to-text transcription.
+
+    Attributes:
+        engine: Speech-to-text engine factory name.
+            Supported values: 'whisper', 'local-whisper'
+            Default: 'whisper'
+    """
+
+    engine: str = "whisper"
+
+
+@dataclass
+class TextToSpeechConfig:
+    """
+    Configuration for text-to-speech synthesis.
+
+    Attributes:
+        engine: Text-to-speech engine factory name.
+            Supported values: 'openai-tts', 'google', 'passthrough'
+            Default: 'openai-tts'
+    """
+
+    engine: str = "openai-tts"
+
+
+@dataclass
+class AudioIOConfig:
+    """
+    Configuration for audio input/output.
+
+    Attributes:
+        audio_source_instance: Custom audio source instance to use instead of default microphone.
+            Default: None
+
+        audio_sink_instance: Custom audio sink/player instance to use instead of default speaker output.
+            Default: None
+    """
+
+    audio_source_instance: Optional[AudioSource] = None
+    audio_sink_instance: Optional[AudioSink] = None
+
+    def __post_init__(self):
+        """Validate audio I/O configuration parameters."""
+        if not isinstance(self.audio_source_instance, (AudioSource, type(None))):
+            raise ValueError(
+                f"audio_source_instance must be an instance of AudioSource or None, got {type(self.audio_source_instance)}"
+            )
+
+        if not isinstance(self.audio_sink_instance, (AudioSink, type(None))):
+            raise ValueError(
+                f"audio_sink_instance must be an instance of AudioSink or None, got {type(self.audio_sink_instance)}"
+            )
+
+
+@dataclass
+class VoiceUIConfig:
+    """
+    Configuration for the VoiceUI class.
+
+    This configuration uses nested dataclasses to organize settings by component:
+    - Type safety and IDE autocomplete
+    - Clear documentation of all available settings
+    - Organized by functional area (SpeechDetection, Transcription, TTS, AudioIO)
+    - Validation of configuration parameters
+
+    Attributes:
+        speech_detection: Configuration for speech detection (VAD + hotword).
+        transcription: Configuration for speech-to-text transcription.
+        text_to_speech: Configuration for text-to-speech synthesis.
+        audio_io: Configuration for audio input/output.
+    """
+
+    speech_detection: SpeechDetectionConfig = field(
+        default_factory=SpeechDetectionConfig
+    )
+    transcription: TranscriptionConfig = field(default_factory=TranscriptionConfig)
+    text_to_speech: TextToSpeechConfig = field(default_factory=TextToSpeechConfig)
+    audio_io: AudioIOConfig = field(default_factory=AudioIOConfig)
