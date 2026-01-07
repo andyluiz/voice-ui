@@ -219,12 +219,11 @@ class WebRTCRemoteMicrophone(VirtualMicrophone):
                     super().__init__(*args, directory=serving_dir, **kwargs)
 
             try:
+                ThreadingHTTPServer.allow_reuse_address = True
                 # Create ThreadingHTTPServer with SO_REUSEADDR
                 self._http_server = ThreadingHTTPServer(
                     ("127.0.0.1", self._http_port), Handler
                 )
-                # Allow port reuse to avoid "Address already in use" errors
-                self._http_server.allow_reuse_address = True
                 logger.info(
                     f"HTTP server started at http://127.0.0.1:{self._http_port} "
                     f"(serving {serving_dir})"

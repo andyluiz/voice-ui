@@ -115,7 +115,7 @@ Development notes & conventions
 
 - Keep public API in `voice_ui/` stable unless performing a broad refactor.
 - Use `unittest` discovery conventions for new tests. Integration tests that require external APIs should be named `integrated_test_*.py` so they can be run with `make online_tests`.
-- Linting and formatting: use the `.venv` environment and run `make flake8`. Development tools (black, isort) are listed in `pyproject.toml`.
+- Linting and formatting: use the `.venv` environment and run `make lint` (ruff). Development tools (black, isort) are listed in `pyproject.toml`.
 
 Code snippets
 

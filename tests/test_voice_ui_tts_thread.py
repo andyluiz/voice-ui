@@ -1,3 +1,4 @@
+import queue
 import threading
 import time
 import unittest
@@ -31,11 +32,7 @@ class TestVoiceUITTSThread(unittest.TestCase):
         fake = FakeTTS()
         fs = FakeSelf()
         fs._terminated = False
-        fs._speaker_queue = (
-            VoiceUI.__dict__["_text_to_speech_thread_function"]
-            .__globals__["queue"]
-            .Queue()
-        )
+        fs._speaker_queue = queue.Queue()
         fs._tts_streamer = fake
 
         # run the unbound function with our fake self in a thread

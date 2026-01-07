@@ -15,6 +15,14 @@ from .hotword_detector import HotwordDetector
 logger = logging.getLogger(__name__)
 
 
+def _clamp(value: int, min_value: int, max_value: int) -> int:
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
+
 class VADAudioSource(AudioSource):
     """Audio source wrapper that applies VAD and optional hotword detection.
 
@@ -79,15 +87,8 @@ class VADAudioSource(AudioSource):
         self._chunk = self._source.chunk_size
         self._channels = self._source.channels
 
-        def clamp(value: int, min_value: int, max_value: int) -> int:
-            if value < min_value:
-                return min_value
-            if value > max_value:
-                return max_value
-            return value
-
         pre_speech_chunks = self.convert_duration_to_chunks(self._pre_speech_duration)
-        pre_speech_chunks = clamp(pre_speech_chunks, 1, 150)
+        pre_speech_chunks = _clamp(pre_speech_chunks, 1, 150)
         logger.debug("Pre speech audio chunk count: %s", pre_speech_chunks)
         self._pre_speech_queue: Deque[bytes] = deque(maxlen=pre_speech_chunks)
 
@@ -148,6 +149,10 @@ class VADAudioSource(AudioSource):
     # Helpers -------------------------------------------------------------------
     @staticmethod
     def convert_data(byte_data: bytes) -> List[int]:
+        if len(byte_data) < 2:
+            return []
+        if len(byte_data) % 2 != 0:
+            byte_data = byte_data[:-1]
         int16_values = struct.unpack(f"{len(byte_data) // 2}h", byte_data)
         return list(int16_values)
 

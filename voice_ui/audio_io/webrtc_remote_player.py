@@ -179,11 +179,15 @@ class WebRTCRemotePlayer(Player):
         for track in self._audio_tracks:
             track.stop()
 
-        for pc in self._pc_instances:
-            try:
-                pc.close()
-            except Exception as e:
-                logger.warning(f"Error closing peer connection: {e}")
+        if self._signaling_server and self._signaling_server._loop:
+            loop = self._signaling_server._loop
+            for pc in self._pc_instances:
+                try:
+                    # pc.close() is a coroutine, must be run on the loop
+                    future = asyncio.run_coroutine_threadsafe(pc.close(), loop)
+                    future.result(timeout=2.0)
+                except Exception as e:
+                    logger.warning(f"Error closing peer connection: {e}")
 
         if self._signaling_server is not None:
             self._signaling_server.stop()

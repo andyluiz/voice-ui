@@ -36,7 +36,7 @@ help:
 	@echo "  venv           Create/upgrade virtual environment (.venv)"
 	@echo "  install        Install dependencies into the virtualenv"
 	@echo "  format         Format code (black)"
-	@echo "  lint           Run linters (flake8)"
+	@echo "  lint           Run linters (ruff)"
 	@echo "  type-check     Run static type checks (mypy)"
 	@echo "  tests          Run unit tests with coverage"
 	@echo "  clean          Clean build artifacts"

@@ -124,9 +124,9 @@ class WebRTCSignalingServer:
 
     def stop(self) -> None:
         """Stop the WebSocket signaling server."""
+        if not self._running:
+            return
         self._running = False
-        if self._loop is not None:
-            self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         logger.info("WebRTC signaling server stopped")
@@ -147,7 +147,7 @@ class WebRTCSignalingServer:
     async def _serve(self) -> None:
         """Run the WebSocket signaling server."""
 
-        async def handler(websocket) -> None:  # type: ignore[no-untyped-def]
+        async def handler(websocket, path) -> None:  # type: ignore[no-untyped-def]
             logger.info("WebSocket client connected; waiting for offer...")
             pc = RTCPeerConnection()
 

@@ -1,8 +1,8 @@
 import logging
 from typing import Dict, List, Optional
 
-from ..audio_io.google_tts_queued_player import GoogleTTSQueuedPlayer
 from ..audio_io.audio_sink import AudioSink
+from ..audio_io.google_tts_queued_player import GoogleTTSQueuedPlayer
 from .pass_through_text_to_speech_streamer import PassThroughTextToSpeechAudioStreamer
 
 logger = logging.getLogger(__name__)
@@ -31,8 +31,10 @@ class GoogleTextToSpeechAudioStreamer(PassThroughTextToSpeechAudioStreamer):
             from google.cloud import texttospeech
 
             client = texttospeech.TextToSpeechClient()
-        except Exception:
-            client = None
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to initialize Google TextToSpeechClient. Please check your credentials and configuration."
+            ) from e
 
         # If no custom queued_player provided, create one
         if queued_player is None:

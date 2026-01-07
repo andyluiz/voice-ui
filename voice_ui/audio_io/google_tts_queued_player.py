@@ -37,9 +37,9 @@ class GoogleTTSQueuedPlayer(QueuedAudioPlayer):
             player: Optional AudioSink instance. If None, a default Player will be created.
             input_timeout: Timeout for getting text from queue (Google's streaming has 5 second limit).
         """
+        super().__init__(player=player)
         self._client = client
         self._input_timeout = input_timeout
-        super().__init__(player=player)
 
     def _get_queue_timeout(self) -> float:
         """Override timeout to match Google's streaming timeout requirements."""
