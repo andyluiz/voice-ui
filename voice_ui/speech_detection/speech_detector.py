@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from ..audio_io.audio_data import AudioData
 from .speaker_profile_manager import SpeakerProfileManager
-from .vad_microphone import MicrophoneVADStream
+from .vad_audio_source import VADAudioSource
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ class SpeechDetector:
             speaker_profiles_dir: Optional path to a directory containing speaker profile files for
                 speaker identification. If provided, speaker detection will be enabled during speech.
                 Defaults to None (speaker detection disabled).
-            threshold: Optional VAD sensitivity threshold. Passed to MicrophoneVADStream.
+            threshold: Optional VAD sensitivity threshold. Passed to VADAudioSource.
                 Defaults to None (uses VAD engine defaults).
             pre_speech_duration: Optional duration in seconds of audio to prepend to detected speech.
                 Helps capture speech that begins just before VAD triggers. Defaults to None.
@@ -129,7 +129,7 @@ class SpeechDetector:
                 Helps capture trailing speech before silence is detected. Defaults to None.
             max_speech_duration: Maximum duration in seconds for a single continuous speech segment.
                 If exceeded, a PartialSpeechEndedEvent is emitted and collection resets. Defaults to 10 seconds.
-            **kwargs: Additional arguments passed to MicrophoneVADStream (e.g., vad_engine, hotword_engine).
+            **kwargs: Additional arguments passed to VADAudioSource (e.g., vad_engine, hotword_engine).
 
         Raises:
             ValueError: Raised in _run() if on_speech_event callback is None when the detector starts.
@@ -138,7 +138,7 @@ class SpeechDetector:
         if max_speech_duration is None:
             max_speech_duration = 10
 
-        self._source_stream = MicrophoneVADStream(
+        self._source_stream = VADAudioSource(
             threshold=threshold,
             pre_speech_duration=pre_speech_duration,
             post_speech_duration=post_speech_duration,
@@ -176,15 +176,15 @@ class SpeechDetector:
     @property
     def detection_mode(self):
         mapping = {
-            MicrophoneVADStream.DetectionMode.HOTWORD: SpeechDetector.DetectionMode.HOTWORD,
-            MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY: SpeechDetector.DetectionMode.VOICE_ACTIVITY,
+            VADAudioSource.DetectionMode.HOTWORD: SpeechDetector.DetectionMode.HOTWORD,
+            VADAudioSource.DetectionMode.VOICE_ACTIVITY: SpeechDetector.DetectionMode.VOICE_ACTIVITY,
         }
         return mapping[self._source_stream.detection_mode]
 
     def set_detection_mode(self, mode: DetectionMode):
         mapping = {
-            SpeechDetector.DetectionMode.HOTWORD: MicrophoneVADStream.DetectionMode.HOTWORD,
-            SpeechDetector.DetectionMode.VOICE_ACTIVITY: MicrophoneVADStream.DetectionMode.VOICE_ACTIVITY,
+            SpeechDetector.DetectionMode.HOTWORD: VADAudioSource.DetectionMode.HOTWORD,
+            SpeechDetector.DetectionMode.VOICE_ACTIVITY: VADAudioSource.DetectionMode.VOICE_ACTIVITY,
         }
         self._source_stream.set_detection_mode(mapping[mode])
 
@@ -219,7 +219,7 @@ class SpeechDetector:
 
                     waiting_for_hotword = (
                         self._source_stream.detection_mode
-                        == MicrophoneVADStream.DetectionMode.HOTWORD
+                        == VADAudioSource.DetectionMode.HOTWORD
                     )
                     if waiting_for_hotword:
                         self._handle_hotword_waiting()

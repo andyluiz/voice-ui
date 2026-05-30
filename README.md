@@ -30,6 +30,23 @@ Project layout (important files)
 - `Makefile` — helper targets for creating the virtualenv, running tests and lint
 - `pyproject.toml` — dependency groups (optional extras: `openai`, `google`, `local-whisper`, `silero`, `funasr`)
 
+Audio source design
+
+Voice UI treats audio input as an abstraction so that local microphones, remote/WebRTC streams, and test sources can be used interchangeably:
+
+- `AudioSourceBase` — a pure abstract interface in `voice_ui/audio_io/audio_source_base.py` defining:
+   - properties: `rate`, `chunk_size`, `channels`, `sample_format`, `sample_size`
+   - methods: `resume()`, `pause()`, and `generator()` (yields PCM byte chunks)
+- Concrete sources implement this interface:
+   - `MicrophoneStream` (`voice_ui/audio_io/microphone.py`) — local microphone via PyAudio
+   - `VirtualMicrophone` (`voice_ui/audio_io/virtual_microphone.py`) — frames injected programmatically (useful for testing, WebRTC integration, or synthetic audio sources)
+   - `WebRTCRemoteMicrophone` (`voice_ui/audio_io/webrtc_remote_microphone.py`) — autonomous WebRTC receiver combining `VirtualMicrophone` with WebRTC signaling
+- `AudioSourceFactory` (`voice_ui/audio_io/audio_source_factory.py`) maps source names (e.g. `"microphone"`, `"remote"`) to concrete classes so call sites can select sources by name or inject custom ones.
+- `VADAudioSource` (`voice_ui/speech_detection/vad_audio_source.py`) wraps any `AudioSourceBase` and applies VAD and optional hotword detection:
+   - consumes `source_instance` or a factory `source_name`
+   - exposes the same audio interface but its `generator()` yields only detected speech and uses `b""` as an end-of-utterance marker
+   - used by `SpeechDetector` as the unified audio front-end regardless of where the audio comes from
+
 Quick start (recommended)
 
 1. Create and activate a virtual environment using the Makefile helper:
@@ -98,7 +115,7 @@ Development notes & conventions
 
 - Keep public API in `voice_ui/` stable unless performing a broad refactor.
 - Use `unittest` discovery conventions for new tests. Integration tests that require external APIs should be named `integrated_test_*.py` so they can be run with `make online_tests`.
-- Linting and formatting: use the `.venv` environment and run `make flake8`. Development tools (black, isort) are listed in `pyproject.toml`.
+- Linting and formatting: use the `.venv` environment and run `make lint` (ruff). Development tools (black, isort) are listed in `pyproject.toml`.
 
 Code snippets
 
@@ -135,6 +152,16 @@ Code snippets
    detector.start()
    # ... detector runs in background; call `detector.stop()` to stop it
    ```
+
+Audio sink design
+
+- `AudioSink` — a small abstract base class (`voice_ui/audio_io/audio_sink.py`) that defines the runtime contract for audio sinks (things that accept PCM bytes for playback). Concrete sinks expose simple metadata properties and play semantics:
+   - properties: `rate`, `chunk_size`, `channels`, `sample_size`
+   - methods: `play(bytes)` to accept raw PCM bytes and `is_playing()` to query state
+- `Player` (`voice_ui/audio_io/player.py`) implements `AudioSink` and provides a PyAudio-backed speaker output. `VirtualPlayer` implements the same interface for queue-based or test usage.
+- `QueuedAudioPlayer` is a producer-consumer helper that serializes playback through a background thread; it accepts any `AudioSink` (or legacy objects exposing `play_data(bytes)`) and will adapt `play_data` calls to the expected `play(bytes)` runtime method when needed.
+
+Use `AudioSink` as the preferred type for function signatures and configuration points so callers can accept any sink implementation (local player, virtual player, WebRTC remote sink, etc.).
 
 - OpenAI TTS streamer (requires `OPENAI_API_KEY` in environment). It plays streamed audio via the built-in player thread.
 

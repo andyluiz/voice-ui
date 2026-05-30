@@ -6,14 +6,14 @@ import dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from voice_ui.speech_detection.vad_microphone import MicrophoneVADStream
+from voice_ui.speech_detection.vad_audio_source import VADAudioSource
 
 dotenv.load_dotenv()
 
 
 # Main function
 def main():
-    stream = MicrophoneVADStream(
+    stream = VADAudioSource(
         # vad_engine='SileroVAD'
         # vad_engine='FunASRVAD'
         # vad_engine='PicoVoiceVAD'

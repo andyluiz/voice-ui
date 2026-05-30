@@ -14,6 +14,10 @@ from colorama import Fore
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from voice_ui.audio_io.player import Player
+
+# Note: `Player` implements the `AudioSink` abstraction (voice_ui/audio_io/audio_sink.py).
+# You can substitute any `AudioSink` implementation (e.g., `VirtualPlayer`, a
+# WebRTC remote sink, or a custom sink) where `Player` is used for playback.
 from voice_ui.audio_io.pyaudio_load_message_suppressor import no_alsa_and_jack_errors
 
 dotenv.load_dotenv()
@@ -73,7 +77,7 @@ def on_message(ws, message):
 
         audio_data = base64.b64decode(audio_delta_base64.encode("utf-8"))
 
-        player.play_data(audio_data)
+        player.play(audio_data)
 
     elif event.get("type") == "response.audio.done":
         pass

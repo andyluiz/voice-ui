@@ -10,7 +10,7 @@ from voice_ui.speech_detection.speech_detector import (
     SpeechEndedEvent,
     SpeechStartedEvent,
 )
-from voice_ui.speech_detection.vad_microphone import MicrophoneVADStream
+from voice_ui.speech_detection.vad_audio_source import VADAudioSource
 
 
 class TestSpeechDetector(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestSpeechDetector(unittest.TestCase):
         self.callback = MagicMock()
         self.speaker_profiles_dir = Path("/path/to/speaker/profiles")
 
-        with patch.object(MicrophoneVADStream, "__init__", return_value=None):
+        with patch.object(VADAudioSource, "__init__", return_value=None):
             self.detector = SpeechDetector(
                 on_speech_event=self.callback,
                 speaker_profiles_dir=self.speaker_profiles_dir,

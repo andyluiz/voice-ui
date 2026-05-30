@@ -44,25 +44,34 @@ class VoiceUI:
         self._speech_events = queue.Queue()
         self._speech_detector = SpeechDetector(
             on_speech_event=lambda event: self._speech_events.put(event),
-            speaker_profiles_dir=self._config.voice_profiles_dir,
-            threshold=self._config.vad_threshold,
-            pre_speech_duration=self._config.pre_speech_duration,  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
-            post_speech_duration=self._config.post_speech_duration,
-            max_speech_duration=self._config.max_speech_duration,
-            additional_keyword_paths=self._config.additional_keyword_paths,
-            vad_engine=self._config.vad_engine,
+            speaker_profiles_dir=self._config.speech_detection.voice_profiles_dir,
+            threshold=self._config.speech_detection.vad_threshold,
+            pre_speech_duration=self._config.speech_detection.pre_speech_duration,  # One second will include the hotword detected. Anything less that 0.75 will truncate it.
+            post_speech_duration=self._config.speech_detection.post_speech_duration,
+            max_speech_duration=self._config.speech_detection.max_speech_duration,
+            additional_keyword_paths=self._config.speech_detection.additional_keyword_paths,
+            vad_engine=self._config.speech_detection.vad_engine,
+            source_instance=self._config.audio_io.audio_source_instance,
         )
         self._speech_event_handler_thread = None
 
         # Voice transcriber
         self._audio_transcriber: SpeechToTextTranscriber = TranscriberFactory.create(
-            self._config.audio_transcriber
+            self._config.transcription.engine
         )
 
         # Voice output
         self._speaker_queue = queue.Queue()
+        if (
+            self._config.text_to_speech is None
+            or self._config.text_to_speech.engine is None
+        ):
+            tts_engine = "passthrough"
+        else:
+            tts_engine = self._config.text_to_speech.engine
+
         self._tts_streamer: TextToSpeechAudioStreamer = TTSFactory.create(
-            self._config.tts_engine
+            tts_engine, player=self._config.audio_io.audio_sink_instance
         )
 
     def _speech_event_handler(self):
@@ -113,7 +122,9 @@ class VoiceUI:
                     continue
 
                 # Handle inactivity
-                hotword_inactivity_timeout = self._config.hotword_inactivity_timeout
+                hotword_inactivity_timeout = (
+                    self._config.speech_detection.hotword_inactivity_timeout
+                )
 
                 # If the hotword inactivity timeout is not set or not a valid number, skip
                 if hotword_inactivity_timeout is None or not isinstance(

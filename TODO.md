@@ -41,6 +41,34 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-creds.json
 make online_tests
 ```
 
+## Audio I/O Architecture
+
+- Create an audio sink base class (analogous to `AudioSourceBase`)
+  - Design interface for audio output abstractions
+  - Refactor `Player` and `WebRTCRemotePlayer` to extend it
+  - Create `AudioSinkFactory` for pluggable output backends
+
+## Examples & Documentation
+
+- Revisit all examples:
+  - Document each example with setup instructions and prerequisites
+  - Improve user experience (progress indicators, better formatting, clearer output)
+  - Fully validate each example end-to-end
+  - Organize by complexity level (01, 02, 03, 04, 05 series)
+
+## Coverage & Testing
+
+- Increase test coverage from 79% to 90%+
+  - Focus on WebRTC modules and optional dependency paths
+  - Add integration tests for VAD, TTS, STT, and speech detection
+- Reorganize tests into subfolders by module:
+  - `tests/voice_activity_detection/`
+  - `tests/speech_detection/`
+  - `tests/speech_recognition/`
+  - `tests/speech_synthesis/`
+  - `tests/audio_io/`
+  - Keep `tests/helpers/` for shared utilities
+
 ## Others
 
 - Create a configuration class for VoiceUI to replace the dictionary.

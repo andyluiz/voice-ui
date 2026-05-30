@@ -32,16 +32,16 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install coverage flake8 black
+          pip install coverage ruff black
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Check formatting with black
         run: |
           black --check . || true
 
-      - name: Lint with flake8
+      - name: Lint with ruff
         run: |
-          flake8 . --count --show-source --statistics || true
+          ruff check . --statistics --exit-zero
 
       - name: Run unit tests (coverage)
         run: |

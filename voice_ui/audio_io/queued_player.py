@@ -3,6 +3,7 @@ import queue
 import threading
 from typing import Any, Optional
 
+from .audio_sink import AudioSink
 from .player import Player
 
 logger = logging.getLogger(__name__)
@@ -21,12 +22,12 @@ class QueuedAudioPlayer:
     This separation allows the player to be used independently and makes testing easier.
     """
 
-    def __init__(self, player: Optional[Player] = None):
+    def __init__(self, player: Optional[AudioSink] = None):
         """
         Initialize the QueuedAudioPlayer.
 
         Args:
-            player: Optional Player instance. If None, a default Player will be created.
+            player: Optional AudioSink instance. If None, a default Player will be created.
         """
         self._player = player or Player()
         self._stopped = False
@@ -78,7 +79,7 @@ class QueuedAudioPlayer:
         """
         self._speaking = True
         try:
-            self._player.play_data(item)
+            self._player.play(item)
         finally:
             self._speaking = False
 

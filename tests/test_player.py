@@ -54,7 +54,7 @@ def make_player_with_fake():
             {"name": "in", "maxInputChannels": 1, "maxOutputChannels": 0},
         ]
     )
-    p._stream = FakeStream()
+    p._audio_stream = FakeStream()
     return p
 
 
@@ -77,13 +77,13 @@ class TestPlayer(unittest.TestCase):
 
     def test_play_data_empty_and_non_empty(self):
         p = make_player_with_fake()
-        p._stream = FakeStream()
-        p.play_data(b"")
-        self.assertEqual(p._stream.written, b"")
+        p._audio_stream = FakeStream()
+        p.play(b"")
+        self.assertEqual(p._audio_stream.written, b"")
 
-        p._stream = FakeStream()
-        p.play_data(b"abc")
-        self.assertEqual(p._stream.written, b"abc")
+        p._audio_stream = FakeStream()
+        p.play(b"abc")
+        self.assertEqual(p._audio_stream.written, b"abc")
 
     def test_play_file_reads_wav_and_writes(self):
         # create temporary wav file
@@ -103,7 +103,7 @@ class TestPlayer(unittest.TestCase):
         p = object.__new__(Player)
         p._audio_interface = AI()
         # ensure _stream exists so __del__ won't fail during GC
-        p._stream = FakeStream()
+        p._audio_stream = FakeStream()
 
         # should not raise
         p.play_file(path)

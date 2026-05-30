@@ -12,7 +12,7 @@ class TranscriberFactory:
     _lock = threading.Lock()
 
     @classmethod
-    def create(cls, transcription_engine_name) -> SpeechToTextTranscriber:
+    def create(cls, transcription_engine_name, **kwargs) -> SpeechToTextTranscriber:
         logger.info(f"Creating transcriber for '{transcription_engine_name}'")
 
         if transcription_engine_name is None:
@@ -20,7 +20,7 @@ class TranscriberFactory:
 
         with cls._lock:
             if transcription_engine_name in cls._transcribers:
-                return cls._transcribers[transcription_engine_name]()
+                return cls._transcribers[transcription_engine_name](**kwargs)
 
         raise RuntimeError(f"Engine '{transcription_engine_name}' is not available")
 
