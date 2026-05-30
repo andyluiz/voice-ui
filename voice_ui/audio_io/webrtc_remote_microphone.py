@@ -169,13 +169,6 @@ class WebRTCRemoteMicrophone(VirtualMicrophone):
                     if self._on_connection_state:
                         self._on_connection_state("disconnected")
 
-            @pc.on("icecandidate")
-            async def on_icecandidate(candidate) -> None:
-                """Send local ICE candidates to peer."""
-                if candidate is None:
-                    return
-                # Note: WebSocket sending happens in signaling server
-
         self._signaling_server.on_peer = on_peer
         self._signaling_server.start()
 

@@ -10,22 +10,24 @@ import queue
 import threading
 from typing import Callable, Optional
 
-from .player import Player
+from .audio_sink import AudioSink
 
 logger = logging.getLogger(__name__)
 
 
-class VirtualPlayer(Player):
+class VirtualPlayer(AudioSink):
     """Queue-based audio player for programmatic frame handling.
 
-    Extends Player with a frame queue that allows applications to queue audio
-    programmatically without device playback. Useful for testing, routing audio
-    to custom sinks, or building audio pipelines.
+    Implements AudioSink with an internal queue so audio frames can be
+    handled programmatically without any audio device. Useful for testing,
+    routing audio to custom sinks, or building audio pipelines.
 
     Args:
         on_audio_frame: Optional callback invoked with each frame queued.
         frame_queue_maxsize: Maximum queue size before frames are dropped
             (default 100).
+        sample_rate: Sample rate in Hz (default 16000).
+        channels: Number of audio channels (default 1).
 
     Example:
         player = VirtualPlayer()
@@ -35,10 +37,11 @@ class VirtualPlayer(Player):
         audio_bytes = b'...'  # 320 samples of int16 PCM at 16kHz
         player.play(audio_bytes)
 
-        # Retrieve queued frames
-        frame = player._queue.get(timeout=1.0)
         player.terminate()
     """
+
+    _CHUNK_SIZE = 320
+    _SAMPLE_SIZE = 2  # int16
 
     def __init__(
         self,
@@ -47,18 +50,35 @@ class VirtualPlayer(Player):
         sample_rate: int = 16000,
         channels: int = 1,
     ) -> None:
-        super().__init__()
         self._on_audio_frame = on_audio_frame
         self._frame_queue: queue.Queue[Optional[bytes]] = queue.Queue(
             maxsize=frame_queue_maxsize
         )
-        self._sample_rate = sample_rate
+        self._rate = sample_rate
         self._channels = channels
         self._queue_thread: Optional[threading.Thread] = None
         self._running = False
 
+    # AudioSink interface ------------------------------------------------------
+    @property
+    def channels(self) -> int:
+        return self._channels
+
+    @property
+    def rate(self) -> int:
+        return self._rate
+
+    @property
+    def chunk_size(self) -> int:
+        return self._CHUNK_SIZE
+
+    @property
+    def sample_size(self) -> int:
+        return self._SAMPLE_SIZE
+
+    # Lifecycle ----------------------------------------------------------------
     def start(self) -> None:
-        """Start the player and frame processing thread."""
+        """Start the frame processing thread."""
         if self._running:
             return
 

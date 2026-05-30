@@ -88,6 +88,10 @@ class TestAudioSourceFactory(unittest.TestCase):
         with self.assertRaises(KeyError):
             AudioSourceFactory.unregister_source("no_such_source_12345")
 
+    def test_create_unknown_engine_raises(self):
+        with self.assertRaises(RuntimeError):
+            AudioSourceFactory.create("no_such_engine_99999")
+
 
 if __name__ == "__main__":
     unittest.main()

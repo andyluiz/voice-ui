@@ -83,5 +83,19 @@ class TestRemoteMicrophoneThreadPaths(unittest.TestCase):
         rm.stop()
 
 
+class TestQueuedPlayerStoppedSkip(unittest.TestCase):
+    def test_stopped_player_skips_queued_items(self):
+        """Items dequeued while stopped are discarded (line 56 continue branch)."""
+        player = FakePlayer()
+        qp = QueuedAudioPlayer(player=player)
+        try:
+            qp.stop()
+            qp.queue_audio(b"skipped")
+            time.sleep(0.15)
+            self.assertEqual(player.played, [])
+        finally:
+            qp.terminate()
+
+
 if __name__ == "__main__":
     unittest.main()

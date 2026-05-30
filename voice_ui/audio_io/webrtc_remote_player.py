@@ -8,18 +8,16 @@ import asyncio
 import logging
 from typing import Any, Optional
 
-from .player import Player
+from .audio_sink import AudioSink
 from .webrtc_signaling_server import WebRTCSignalingServer
 
 logger = logging.getLogger(__name__)
 
 try:
-    from aiortc import RTCRtpSender
     from aiortc.mediastreams import AudioStreamTrack
 
     _WEBRTC_COMPONENTS_AVAILABLE = True
 except Exception:
-    RTCRtpSender = None  # type: ignore
     AudioStreamTrack = None  # type: ignore
     _WEBRTC_COMPONENTS_AVAILABLE = False
 
@@ -46,20 +44,18 @@ class AudioGeneratorTrack(AudioStreamTrack):
     async def recv(self):
         """Receive audio frame from queue and convert to AVFrame."""
         import av
+        import numpy as np
 
         # Get PCM data from queue
         try:
             pcm_data = await asyncio.wait_for(self._audio_queue.get(), timeout=1.0)
         except asyncio.TimeoutError:
             # Return silence if no data available
-            import numpy as np
-
             pcm_data = b"\x00\x00" * 160  # 160 samples of silence
 
-        # Convert PCM bytes to numpy array
-        import numpy as np
-
-        audio_array = np.frombuffer(pcm_data, dtype=np.int16)
+        # Convert PCM bytes to numpy array; av.AudioFrame.from_ndarray
+        # requires shape (channels, samples) for the "s16" format.
+        audio_array = np.frombuffer(pcm_data, dtype=np.int16).reshape(1, -1)
 
         # Create AVFrame
         frame = av.AudioFrame.from_ndarray(audio_array, format="s16", layout="mono")
@@ -72,10 +68,10 @@ class AudioGeneratorTrack(AudioStreamTrack):
         self._running = False
 
 
-class WebRTCRemotePlayer(Player):
+class WebRTCRemotePlayer(AudioSink):
     """Player that sends audio to WebRTC peers.
 
-    This class combines Player with WebRTCSignalingServer, providing a
+    This class combines AudioSink with WebRTCSignalingServer, providing a
     solution for sending audio to WebRTC peers. Audio can be pushed frame
     by frame via the play() method.
 
@@ -101,6 +97,11 @@ class WebRTCRemotePlayer(Player):
         player.stop()
     """
 
+    _RATE = 16000
+    _CHANNELS = 1
+    _CHUNK_SIZE = 320
+    _SAMPLE_SIZE = 2  # int16
+
     def __init__(
         self,
         signaling_port: int = 8765,
@@ -108,8 +109,6 @@ class WebRTCRemotePlayer(Player):
         ice_servers: Optional[list] = None,
         on_connection_state: Optional[Any] = None,
     ) -> None:
-        super().__init__()
-
         if not _WEBRTC_COMPONENTS_AVAILABLE:
             logger.warning(
                 "WebRTC components not available. "
@@ -126,6 +125,24 @@ class WebRTCRemotePlayer(Player):
         self._pc_instances: list = []
         self._running = False
 
+    # AudioSink interface ------------------------------------------------------
+    @property
+    def channels(self) -> int:
+        return self._CHANNELS
+
+    @property
+    def rate(self) -> int:
+        return self._RATE
+
+    @property
+    def chunk_size(self) -> int:
+        return self._CHUNK_SIZE
+
+    @property
+    def sample_size(self) -> int:
+        return self._SAMPLE_SIZE
+
+    # Lifecycle ----------------------------------------------------------------
     def start(self) -> None:
         """Start the WebRTC signaling server."""
         if self._running:
@@ -133,7 +150,6 @@ class WebRTCRemotePlayer(Player):
 
         self._running = True
 
-        # Create signaling server with audio sending handler
         self._signaling_server = WebRTCSignalingServer(
             port=self._signaling_port,
             host=self._signaling_host,
@@ -146,13 +162,9 @@ class WebRTCRemotePlayer(Player):
                 self._on_connection_state("connecting")
 
             try:
-                # Create audio track that will be sent to peer
                 audio_track = AudioGeneratorTrack()
                 self._audio_tracks.append(audio_track)
-
-                # Add track to peer connection
-                asyncio.create_task(pc.addTrack(audio_track, "audio"))
-
+                pc.addTrack(audio_track)
                 logger.info("Audio track added for remote peer")
 
                 if self._on_connection_state:
@@ -183,7 +195,6 @@ class WebRTCRemotePlayer(Player):
             loop = self._signaling_server._loop
             for pc in self._pc_instances:
                 try:
-                    # pc.close() is a coroutine, must be run on the loop
                     future = asyncio.run_coroutine_threadsafe(pc.close(), loop)
                     future.result(timeout=2.0)
                 except Exception as e:
@@ -208,7 +219,6 @@ class WebRTCRemotePlayer(Player):
             logger.warning("Player not running; ignoring audio data")
             return
 
-        # Push to all connected audio tracks
         for track in self._audio_tracks:
             try:
                 track.add_frame(audio_data)

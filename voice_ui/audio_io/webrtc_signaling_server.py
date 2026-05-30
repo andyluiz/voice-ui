@@ -220,7 +220,7 @@ class WebRTCSignalingServer:
             if candidate_data:
                 sdp = candidate_data.get("candidate", "")
                 if sdp.startswith("candidate:"):
-                    sdp = sdp.split(" ", 1)[1]
+                    sdp = sdp.split(":", 1)[1]
 
                 try:
                     # Parse candidate using AioiceCandidate, then create RTCIceCandidate
